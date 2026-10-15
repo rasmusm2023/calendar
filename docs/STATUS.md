@@ -11,8 +11,8 @@ Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid för
 - [ ] M3. Aktivera Auth med Google-leverantören (support-e-post).
 - [x] M4 (kontrollerat 2026-10-16: databasen finns, `europe-west3`, native). Skapa Firestore-databasen (produktionsläge, `europe-west3`).
 - [x] M5 (bekräftat av dig 2026-10-16). Aktivera Google Calendar API i samma Google Cloud-projekt.
-- [ ] M6. OAuth consent screen (External), scope `https://www.googleapis.com/auth/calendar`, lägg till din e-post som testanvändare. I Testing-läge går refresh tokens ut efter 7 dagar. Sätt "In production" för långvarig personlig användning.
-- [~] M7 (Client ID finns i .env.local och hör till rätt projekt. Origin och secret går inte att verifiera härifrån). Skapa en egen OAuth-klient (Web application) med authorized JS origin `http://localhost:5173` (hostingdomän senare). Client ID går i `VITE_GOOGLE_CLIENT_ID`. Secret används bara av Functions.
+- [x] M6 (bekräftat av dig 2026-10-16). OAuth consent screen (External), scope `https://www.googleapis.com/auth/calendar`, lägg till din e-post som testanvändare. I Testing-läge går refresh tokens ut efter 7 dagar. Sätt "In production" för långvarig personlig användning.
+- [x] M7 (bekräftat av dig 2026-10-16. Client ID finns i .env.local och hör till rätt projekt. Origin och secret går inte att verifiera härifrån). Skapa en egen OAuth-klient (Web application) med authorized JS origin `http://localhost:5173` (hostingdomän senare). Client ID går i `VITE_GOOGLE_CLIENT_ID`. Secret används bara av Functions.
 - [x] M8. `npx firebase-tools@latest login` och `firebase use <project-id>` (uppdatera `.firebaserc`, som idag pekar på `demo-spaces-calendar`).
 - [x] M9 (2026-10-16: båda secrets har aktiverad version 1. Att paret stämmer ihop prövas först i steg 0.20). `npx firebase-tools functions:secrets:set GOOGLE_CLIENT_ID` och `GOOGLE_CLIENT_SECRET`. Du skriver värdena själv, assistenten ska aldrig se dem. För emulatorn: `functions/.secret.local`.
 - [x] M10. Skapa `.env.local` från `.env.example`.
