@@ -1,9 +1,26 @@
 {
   "app": {
-    "name": "Spaces Calendar"
+    "name": "Spaces Calendar",
+    "configError": {
+      "title": "Appen är inte konfigurerad",
+      "hint": "Kopiera .env.example till .env.local och fyll i värdena, eller starta mot emulatorer med npm run dev:emulator."
+    }
   },
   "common": {
     "loading": "Laddar…",
     "retry": "Försök igen"
+  },
+  "auth": {
+    "signIn": {
+      "title": "Logga in",
+      "description": "Logga in med ditt Google-konto för att se dina kalendrar.",
+      "button": "Logga in med Google",
+      "errorTitle": "Inloggningen misslyckades",
+      "error": {
+        "failed": "Något gick fel vid inloggningen. Försök igen.",
+        "popupBlocked": "Webbläsaren blockerade inloggningsfönstret. Tillåt popup-fönster för den här sidan och försök igen."
+      }
+    },
+    "signOut": "Logga ut"
   }
 }
