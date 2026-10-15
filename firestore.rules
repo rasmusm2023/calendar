@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// Firestore innehåller bara appens metadata (spaces, familjer, regler, kalenderinställningar och
+// användarinställningar). Händelsedata lagras aldrig här, och därför finns ingen regel för det.
+//
+// VIKTIGT: Firestore kombinerar överlappande match-regler med OR. En bred regel som
+// `match /users/{uid}/{document=**}` skulle därför ge klienten åtkomst även till `private/google`
+// (refresh token), oavsett en separat `allow ...: if false`. Därför matchas bara de tillåtna
+// samlingarna uttryckligen, och `private` saknar match helt (allt som inte matchas nekas).
+// `private/google` nås bara av Cloud Functions via Admin SDK, som går förbi reglerna.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      // Själva användardokumentet (inga subsamlingar ärvs härifrån).
+      allow read, write: if isOwner(uid);
+
+      match /settings/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /spaces/{spaceId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /calendarPrefs/{calendarId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /families/{familyId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /familyRules/{ruleId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Medvetet ingen match för /private/{doc}: klienten får aldrig läsa eller skriva den.
+    }
+  }
+}

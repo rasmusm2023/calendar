@@ -11,6 +11,7 @@ functions/lib/
 .env
 .env.*
 !.env.example
+!.env.emulator
 functions/.env
 functions/.env.*
 !functions/.env.example
