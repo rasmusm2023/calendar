@@ -1,0 +1,39 @@
+---
+alwaysApply: true
+---
+
+---
+
+description: Kärnregler för Spaces Calendar (React/TS + Google Calendar API + Firebase)
+alwaysApply: true
+
+---
+
+# Spaces Calendar – regler för AI-assistenten
+
+Läs alltid `docs/PRD.md` (vad som ska byggas) och `docs/PROJECT.md` (hur) innan du gör större ändringar. Följ faserna i PRD avsnitt 10. Bygg inte funktioner från senare faser i förväg.
+
+## Arkitektur – får aldrig brytas
+
+- Google Calendar är källan för händelser. Spara **aldrig** händelsedata i Firestore. Firestore innehåller bara spaces, familjer, regler, kalenderinställningar och användarinställningar.
+- Appens fält på händelser lagras i `extendedProperties.private` (`scFamilyId`, `scImportant`).
+- Färger räknas ut när händelsen visas, via `resolveEventStyle`. Lagra aldrig familjefärg per händelse i appen.
+- All Google-kommunikation går via `src/lib/google/`. FullCalendar importeras bara i `src/features/calendar/adapter/`.
+- Alla mutationer går via undo-kommandon (`src/lib/undo/`): optimistisk uppdatering → API-anrop → rollback med toast vid fel.
+- Refresh tokens hanteras bara i Cloud Functions. Klienten håller access token endast i minnet. Inga secrets i `VITE_`-variabler.
+
+## Kod
+
+- TypeScript strict, ingen `any`. Validera extern data med zod.
+- Funktionsbaserade mappar (`src/features/*`) med publikt API via `index.ts`.
+- Tailwind + CSS-variabler. Inga hårdkodade hex-värden i komponenter.
+- Datum med date-fns + `@date-fns/tz`. Veckan börjar på måndag och 24h är standard.
+- All UI-text via i18n (sv/en).
+- Tillgänglighet: tangentbordsstöd, synligt fokus och Radix/shadcn-primitiver.
+
+## Kvalitet
+
+- UX-kvalitet går före antal funktioner. Drag & drop ska hålla 60 fps, utan flicker, och kunna avbrytas med Esc.
+- Skriv tester: Vitest för ren logik och Playwright + MSW för interaktioner (dra, ändra längd, återkommande, ångra, rollback).
+- Varje ändring ska lämna projektet byggbart, utan TS- eller ESLint-fel.
+- Är ett krav otydligt: fråga hellre än att gissa, och föreslå en uppdatering av PRD.
