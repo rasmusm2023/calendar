@@ -1,0 +1,9 @@
+{
+  "app": {
+    "name": "Spaces Calendar"
+  },
+  "common": {
+    "loading": "Loading…",
+    "retry": "Try again"
+  }
+}

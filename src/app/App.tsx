@@ -1,4 +1,7 @@
+import { useTranslation } from 'react-i18next'
+
 export function App() {
-  // Platshållare. Texter och layout tillkommer i senare steg (via i18n).
-  return <main data-testid="app-root" />
+  const { t } = useTranslation()
+  // Platshållare. Layout och innehåll tillkommer i senare steg.
+  return <main data-testid="app-root" aria-label={t('app.name')} />
 }
