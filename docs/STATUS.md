@@ -6,7 +6,7 @@ Hålls uppdaterad av AI-assistenten. Vid sessionsstart ska assistenten påminna 
 
 Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid före deploy av functions eller regler.
 
-- [~] M1. Projektet calendar-38155 finns. KVAR: uppgradera till Blaze (sätt budgetlarm), region `europe-west3`. Ge assistenten projekt-ID:t.
+- [x] M1. Projektet `calendar-38155` finns och är på Blaze (kontrollerat 2026-10-16). Kvar att kolla själv: att budgetlarm är satt.
 - [x] M2. Registrera Web-appen och kopiera apiKey/authDomain/projectId/appId till `.env.local`.
 - [ ] M3. Aktivera Auth med Google-leverantören (support-e-post).
 - [x] M4 (kontrollerat 2026-10-16: databasen finns, `europe-west3`, native). Skapa Firestore-databasen (produktionsläge, `europe-west3`).
