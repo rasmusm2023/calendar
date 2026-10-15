@@ -20,9 +20,9 @@ Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid för
 
 ## Fas 0 – läge
 
-Klart: steg 0.1–0.13. Steg 0.13 är token i minnet (`src/lib/google/token.ts`), Google Identity Services (`gis.ts`), funktionsklienten (`src/lib/firebase/googleFunctions.ts`) och `src/features/google-access/` med "Koppla Google Calendar"/"Koppla om"-skärmar. Token glöms vid utloggning och byte av användare. Inte provat mot riktiga Google ännu (kräver deploy av functions och steg 0.20). Steg 0.12 är Cloud Functions `googleConnect` och `googleAccessToken` i `functions/` (35 enhetstester och 11 emulatortester via `npm run test:functions:emulator`, ännu inte deployade). Steg 0.1–0.11 är scaffold, lint, Tailwind/shadcn, tester, i18n, datum, färg, Google-scheman, Firebase init + regler och Google-inloggning med bestående session.
+Klart: steg 0.1–0.14. Steg 0.14 är Google-klienten (src/lib/google/client.ts och calendar.ts): token, ett nytt försök vid 401, exponentiell backoff med jitter vid 429/5xx/rate limit-403/nätverksfel (Retry-After följs), paginering, listCalendars, listEvents och listEventsForCalendars (4 kalendrar åt gången, en trasig kalender stoppar inte de andra). Steg 0.13 är token i minnet (`src/lib/google/token.ts`), Google Identity Services (`gis.ts`), funktionsklienten (`src/lib/firebase/googleFunctions.ts`) och `src/features/google-access/` med "Koppla Google Calendar"/"Koppla om"-skärmar. Token glöms vid utloggning och byte av användare. Inte provat mot riktiga Google ännu (kräver deploy av functions och steg 0.20). Steg 0.12 är Cloud Functions `googleConnect` och `googleAccessToken` i `functions/` (35 enhetstester och 11 emulatortester via `npm run test:functions:emulator`, ännu inte deployade). Steg 0.1–0.11 är scaffold, lint, Tailwind/shadcn, tester, i18n, datum, färg, Google-scheman, Firebase init + regler och Google-inloggning med bestående session.
 
-Kvar: 0.14 Google-klient, 0.15 TanStack Query, 0.16 FullCalendar-adapter, 0.17 veckosida, 0.17b kalendervalg, 0.18 fellägen ("Koppla om"), 0.19 E2E, 0.20 riktig acceptans.
+Kvar: 0.15 TanStack Query, 0.16 FullCalendar-adapter, 0.17 veckosida, 0.17b kalendervalg, 0.18 fellägen ("Koppla om"), 0.19 E2E, 0.20 riktig acceptans.
 
 ## Kända problem
 
