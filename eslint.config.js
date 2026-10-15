@@ -114,6 +114,14 @@ export default tseslint.config(
     },
   },
 
+  // shadcn-genererade komponenter exporterar t.ex. variants tillsammans med komponenten.
+  {
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+
   // Konfigfiler (Node).
   {
     files: ['*.config.{ts,js}'],
