@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseIsoInZone, shiftWeekRange, toRfc3339, weekRange } from './index'
+import {
+  localDateTimeToRfc3339,
+  parseIsoInZone,
+  shiftWeekRange,
+  toRfc3339,
+  weekRange,
+} from './index'
 
 const STOCKHOLM = 'Europe/Stockholm'
 const HOUR = 3_600_000
@@ -159,5 +165,32 @@ describe('parseIsoInZone', () => {
   it('kastar för okänt format', () => {
     expect(() => parseIsoInZone('i morgon', STOCKHOLM)).toThrow(/Okänt datumformat/)
     expect(() => parseIsoInZone('', STOCKHOLM)).toThrow(/Okänt datumformat/)
+  })
+})
+
+describe('localDateTimeToRfc3339', () => {
+  it('tolkar lokal tid i given tidszon och lägger till rätt offset', () => {
+    expect(localDateTimeToRfc3339('2026-10-19T09:00:00', STOCKHOLM)).toBe(
+      '2026-10-19T09:00:00+02:00',
+    )
+    expect(localDateTimeToRfc3339('2026-10-26T09:00:00', STOCKHOLM)).toBe(
+      '2026-10-26T09:00:00+01:00',
+    )
+    expect(localDateTimeToRfc3339('2026-10-19T09:00:00', 'America/New_York')).toBe(
+      '2026-10-19T09:00:00-04:00',
+    )
+  })
+
+  it('tillåter utelämnade sekunder och bråkdelssekunder', () => {
+    expect(localDateTimeToRfc3339('2026-10-19T09:30', STOCKHOLM)).toBe('2026-10-19T09:30:00+02:00')
+    expect(localDateTimeToRfc3339('2026-10-19T09:30:15.250', STOCKHOLM)).toBe(
+      '2026-10-19T09:30:15+02:00',
+    )
+  })
+
+  it('kastar för strängar som redan har offset, är fel format eller omöjliga datum', () => {
+    expect(() => localDateTimeToRfc3339('2026-10-19T09:00:00+02:00', STOCKHOLM)).toThrow()
+    expect(() => localDateTimeToRfc3339('2026-10-19', STOCKHOLM)).toThrow()
+    expect(() => localDateTimeToRfc3339('2026-02-30T09:00:00', STOCKHOLM)).toThrow(/Ogiltigt datum/)
   })
 })

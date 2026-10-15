@@ -1,4 +1,4 @@
-export { parseIsoInZone } from './parse'
+export { localDateTimeToRfc3339, parseIsoInZone } from './parse'
 export {
   DEFAULT_WEEK_STARTS_ON,
   getBrowserTimeZone,
