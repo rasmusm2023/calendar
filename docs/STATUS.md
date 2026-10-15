@@ -6,16 +6,16 @@ Hålls uppdaterad av AI-assistenten. Vid sessionsstart ska assistenten påminna 
 
 Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid före deploy av functions eller regler.
 
-- [ ] M1. Skapa Firebase-projektet i konsolen, uppgradera till Blaze (sätt budgetlarm), region `europe-west3`. Ge assistenten projekt-ID:t.
-- [ ] M2. Registrera Web-appen och kopiera apiKey/authDomain/projectId/appId till `.env.local`.
+- [~] M1. Projektet calendar-38155 finns. KVAR: uppgradera till Blaze (sätt budgetlarm), region `europe-west3`. Ge assistenten projekt-ID:t.
+- [x] M2. Registrera Web-appen och kopiera apiKey/authDomain/projectId/appId till `.env.local`.
 - [ ] M3. Aktivera Auth med Google-leverantören (support-e-post).
-- [ ] M4. Skapa Firestore-databasen (produktionsläge, `europe-west3`).
+- [ ] M4 (kontrollerat 2026-10-16: Firestore API är inte aktiverat, databasen saknas). Skapa Firestore-databasen (produktionsläge, `europe-west3`).
 - [ ] M5. Aktivera Google Calendar API i samma Google Cloud-projekt.
 - [ ] M6. OAuth consent screen (External), scope `https://www.googleapis.com/auth/calendar`, lägg till din e-post som testanvändare. I Testing-läge går refresh tokens ut efter 7 dagar. Sätt "In production" för långvarig personlig användning.
-- [ ] M7. Skapa en egen OAuth-klient (Web application) med authorized JS origin `http://localhost:5173` (hostingdomän senare). Client ID går i `VITE_GOOGLE_CLIENT_ID`. Secret används bara av Functions.
-- [ ] M8. `npx firebase-tools@latest login` och `firebase use <project-id>` (uppdatera `.firebaserc`, som idag pekar på `demo-spaces-calendar`).
+- [~] M7 (Client ID finns i .env.local och hör till rätt projekt. Origin och secret går inte att verifiera härifrån). Skapa en egen OAuth-klient (Web application) med authorized JS origin `http://localhost:5173` (hostingdomän senare). Client ID går i `VITE_GOOGLE_CLIENT_ID`. Secret används bara av Functions.
+- [x] M8. `npx firebase-tools@latest login` och `firebase use <project-id>` (uppdatera `.firebaserc`, som idag pekar på `demo-spaces-calendar`).
 - [ ] M9. `npx firebase-tools functions:secrets:set GOOGLE_CLIENT_ID` och `GOOGLE_CLIENT_SECRET`. Du skriver värdena själv, assistenten ska aldrig se dem. För emulatorn: `functions/.secret.local`.
-- [ ] M10. Skapa `.env.local` från `.env.example`.
+- [x] M10. Skapa `.env.local` från `.env.example`.
 - [x] M11. JDK 21 installerat (för emulatorerna).
 
 ## Fas 0 – läge

@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-spaces-calendar"
+    "default": "calendar-38155",
+    "emulator": "demo-spaces-calendar"
   }
 }
