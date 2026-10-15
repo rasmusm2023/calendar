@@ -10,7 +10,7 @@ Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid för
 - [x] M2. Registrera Web-appen och kopiera apiKey/authDomain/projectId/appId till `.env.local`.
 - [ ] M3. Aktivera Auth med Google-leverantören (support-e-post).
 - [x] M4 (kontrollerat 2026-10-16: databasen finns, `europe-west3`, native). Skapa Firestore-databasen (produktionsläge, `europe-west3`).
-- [ ] M5. Aktivera Google Calendar API i samma Google Cloud-projekt.
+- [x] M5 (bekräftat av dig 2026-10-16). Aktivera Google Calendar API i samma Google Cloud-projekt.
 - [ ] M6. OAuth consent screen (External), scope `https://www.googleapis.com/auth/calendar`, lägg till din e-post som testanvändare. I Testing-läge går refresh tokens ut efter 7 dagar. Sätt "In production" för långvarig personlig användning.
 - [~] M7 (Client ID finns i .env.local och hör till rätt projekt. Origin och secret går inte att verifiera härifrån). Skapa en egen OAuth-klient (Web application) med authorized JS origin `http://localhost:5173` (hostingdomän senare). Client ID går i `VITE_GOOGLE_CLIENT_ID`. Secret används bara av Functions.
 - [x] M8. `npx firebase-tools@latest login` och `firebase use <project-id>` (uppdatera `.firebaserc`, som idag pekar på `demo-spaces-calendar`).
