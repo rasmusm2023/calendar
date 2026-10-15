@@ -75,8 +75,11 @@ Secrets: GOOGLE*CLIENT_SECRET via firebase functions:secrets:set. Får aldrig li
    accountId på calendarPrefs finns för framtida stöd för flera konton (v2). I v1 är värdet alltid "primary".
    Alla dokument valideras med zod-scheman i src/lib/firebase/schemas.ts.
    4.3 Firestore-regler (princip)
-   match /users/{uid}/{document=\*\*} { allow read, write: if request.auth.uid == uid; }
-   match /users/{uid}/private/{doc} { allow read, write: if false; } // bara Admin SDK
+   Firestore kombinerar överlappande match-regler med OR. En bred regel som `match /users/{uid}/{document=**}` ger därför ägaren åtkomst även till `private/google` (refresh token), och en separat `allow ...: if false` hjälper inte. Matcha i stället bara de tillåtna samlingarna uttryckligen och lämna `private` helt utan match (allt som inte matchas nekas). Cloud Functions når `private/google` via Admin SDK, som går förbi reglerna.
+   match /users/{uid} { allow read, write: if request.auth.uid == uid; }
+   match /users/{uid}/settings/{doc} { allow read, write: if request.auth.uid == uid; }
+   (samma regel för spaces, calendarPrefs, families och familyRules; ingen match för private)
+   Se firestore.rules och firestore-tests/ (regeltesterna bevisar bland annat att klienten nekas åtkomst till private/google).
 5. Kärnlogik
    5.1 Familjetillhörighet och stil (ren funktion)
    resolveFamily(event, ctx) → familyId | null, i den här ordningen:
