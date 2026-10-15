@@ -22,5 +22,32 @@
       }
     },
     "signOut": "Logga ut"
+  },
+  "googleAccess": {
+    "connect": {
+      "title": "Koppla Google Calendar",
+      "description": "Spaces Calendar behöver åtkomst till dina Google-kalendrar för att kunna visa och ändra dina händelser. Åtkomsten sparas säkert på servern, så du behöver bara göra det här en gång.",
+      "button": "Koppla Google Calendar"
+    },
+    "reconnect": {
+      "title": "Åtkomsten till Google Calendar har upphört",
+      "description": "Åtkomsten har återkallats eller gått ut. Koppla om för att fortsätta se och ändra dina händelser.",
+      "button": "Koppla om"
+    },
+    "checkError": {
+      "title": "Det gick inte att kontrollera kopplingen till Google Calendar",
+      "description": "Kontrollera din internetanslutning och försök igen."
+    },
+    "errorTitle": "Kopplingen misslyckades",
+    "error": {
+      "popupBlocked": "Webbläsaren blockerade Googles fönster. Tillåt popup-fönster för den här sidan och försök igen.",
+      "loadFailed": "Det gick inte att läsa in Googles inloggningsskript. Kontrollera din internetanslutning och försök igen.",
+      "failed": "Något gick fel hos Google. Försök igen.",
+      "insufficientScope": "Du behöver godkänna åtkomst till din kalender. Försök igen och låt rutan för Google Calendar vara ikryssad.",
+      "noRefreshToken": "Google gav ingen bestående åtkomst. Försök igen och godkänn alla behörigheter.",
+      "codeExchangeFailed": "Googles godkännande gick inte att använda. Försök igen.",
+      "unavailable": "Det gick inte att nå Google eller servern just nu. Försök igen om en stund.",
+      "unknown": "Något gick fel. Försök igen."
+    }
   }
 }

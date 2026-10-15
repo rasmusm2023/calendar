@@ -3,16 +3,29 @@ import { createRoot } from 'react-dom/client'
 import { I18nextProvider } from 'react-i18next'
 import { App, ConfigErrorScreen, applySystemTheme } from '@/app'
 import { AuthProvider, createFirebaseAuthService } from '@/features/auth'
+import { GoogleAccessProvider, createGoogleAccessService } from '@/features/google-access'
 import { setupAppI18n } from '@/i18n'
-import { EnvError, getFirebase } from '@/lib/firebase'
+import {
+  EnvError,
+  createFirebaseTransport,
+  createGoogleFunctionsClient,
+  getEnv,
+  getFirebase,
+} from '@/lib/firebase'
 import './index.css'
 
 function createContent(): ReactNode {
   try {
-    const { auth } = getFirebase()
+    const { auth, functions } = getFirebase()
+    const googleAccess = createGoogleAccessService({
+      clientId: getEnv().googleClientId,
+      functions: createGoogleFunctionsClient(createFirebaseTransport(functions)),
+    })
     return (
       <AuthProvider service={createFirebaseAuthService(auth)}>
-        <App />
+        <GoogleAccessProvider service={googleAccess}>
+          <App />
+        </GoogleAccessProvider>
       </AuthProvider>
     )
   } catch (error) {

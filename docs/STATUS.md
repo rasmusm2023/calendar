@@ -20,9 +20,9 @@ Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid för
 
 ## Fas 0 – läge
 
-Klart: steg 0.1–0.12. Steg 0.12 är Cloud Functions `googleConnect` och `googleAccessToken` i `functions/` (35 enhetstester och 11 emulatortester via `npm run test:functions:emulator`, ännu inte deployade). Steg 0.1–0.11 är scaffold, lint, Tailwind/shadcn, tester, i18n, datum, färg, Google-scheman, Firebase init + regler och Google-inloggning med bestående session.
+Klart: steg 0.1–0.13. Steg 0.13 är token i minnet (`src/lib/google/token.ts`), Google Identity Services (`gis.ts`), funktionsklienten (`src/lib/firebase/googleFunctions.ts`) och `src/features/google-access/` med "Koppla Google Calendar"/"Koppla om"-skärmar. Token glöms vid utloggning och byte av användare. Inte provat mot riktiga Google ännu (kräver deploy av functions och steg 0.20). Steg 0.12 är Cloud Functions `googleConnect` och `googleAccessToken` i `functions/` (35 enhetstester och 11 emulatortester via `npm run test:functions:emulator`, ännu inte deployade). Steg 0.1–0.11 är scaffold, lint, Tailwind/shadcn, tester, i18n, datum, färg, Google-scheman, Firebase init + regler och Google-inloggning med bestående session.
 
-Kvar: 0.13 token + GIS, 0.14 Google-klient, 0.15 TanStack Query, 0.16 FullCalendar-adapter, 0.17 veckosida, 0.17b kalendervalg, 0.18 fellägen ("Koppla om"), 0.19 E2E, 0.20 riktig acceptans.
+Kvar: 0.14 Google-klient, 0.15 TanStack Query, 0.16 FullCalendar-adapter, 0.17 veckosida, 0.17b kalendervalg, 0.18 fellägen ("Koppla om"), 0.19 E2E, 0.20 riktig acceptans.
 
 ## Kända problem
 
@@ -31,4 +31,4 @@ Kvar: 0.13 token + GIS, 0.14 Google-klient, 0.15 TanStack Query, 0.16 FullCalend
 - Firebase-bundlen ger chunk-varning (code-splitting senare).
 - PROJECT.md är otydlig om var `settings` ligger (`users/{uid}` eller `users/{uid}/settings/{doc}`). Reglerna tillåter båda.
 - Dubbel frontmatter i `.cursor/rules/project.mdc`.
-- Utloggning bör rensa Google-token i minnet (steg 0.13).
+- E2E-testerna i `e2e/auth.spec.ts` använder knappen "Logga ut" som tecken på inloggad användare, eftersom appen nu stannar på kopplingsskärmen tills Google är kopplat. Functions-emulatorn startas inte i Playwright än (steg 0.19).

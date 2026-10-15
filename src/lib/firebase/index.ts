@@ -7,6 +7,14 @@ export {
   type AppEnv,
 } from './env'
 export {
+  createFirebaseTransport,
+  createGoogleFunctionsClient,
+  mapCallableError,
+  type CallableTransport,
+  type ConnectResult,
+  type GoogleFunctionsClient,
+} from './googleFunctions'
+export {
   EMULATOR_HOST,
   EMULATOR_PORTS,
   getFirebase,

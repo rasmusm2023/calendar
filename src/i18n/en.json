@@ -22,5 +22,32 @@
       }
     },
     "signOut": "Sign out"
+  },
+  "googleAccess": {
+    "connect": {
+      "title": "Connect Google Calendar",
+      "description": "Spaces Calendar needs access to your Google calendars to show and change your events. Access is stored securely on the server, so you only need to do this once.",
+      "button": "Connect Google Calendar"
+    },
+    "reconnect": {
+      "title": "Access to Google Calendar has ended",
+      "description": "Access was revoked or has expired. Reconnect to keep seeing and changing your events.",
+      "button": "Reconnect"
+    },
+    "checkError": {
+      "title": "Could not check the connection to Google Calendar",
+      "description": "Check your internet connection and try again."
+    },
+    "errorTitle": "Connecting failed",
+    "error": {
+      "popupBlocked": "The browser blocked the Google window. Allow pop-ups for this site and try again.",
+      "loadFailed": "Could not load Google's sign-in script. Check your internet connection and try again.",
+      "failed": "Something went wrong at Google. Please try again.",
+      "insufficientScope": "You need to approve access to your calendar. Try again and leave the Google Calendar box checked.",
+      "noRefreshToken": "Google did not grant lasting access. Try again and approve all permissions.",
+      "codeExchangeFailed": "Google's approval could not be used. Please try again.",
+      "unavailable": "Could not reach Google or the server right now. Try again in a moment.",
+      "unknown": "Something went wrong. Please try again."
+    }
   }
 }

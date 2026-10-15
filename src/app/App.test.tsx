@@ -3,18 +3,23 @@ import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { describe, expect, it } from 'vitest'
 import { AuthProvider } from '@/features/auth'
+import { GoogleAccessProvider } from '@/features/google-access'
 import { createI18n } from '@/i18n'
 import { createFakeAuthService, TEST_USER, type InitialAuth } from '@/test/fakeAuthService'
+import { createFakeGoogleAccessService } from '@/test/fakeGoogleAccessService'
 import { App } from './App'
 import { ConfigErrorScreen } from './ConfigErrorScreen'
 
 async function renderApp(initial: InitialAuth) {
   const fake = createFakeAuthService(initial)
+  const google = createFakeGoogleAccessService('connected')
   const i18n = await createI18n('sv')
   render(
     <I18nextProvider i18n={i18n}>
       <AuthProvider service={fake.service}>
-        <App />
+        <GoogleAccessProvider service={google.service}>
+          <App />
+        </GoogleAccessProvider>
       </AuthProvider>
     </I18nextProvider>,
   )
