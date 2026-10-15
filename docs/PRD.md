@@ -53,6 +53,7 @@ Grundprincip: UI och UX måste fungera felfritt. Allt som känns sämre än Goog
 P0 Logga in med Google (Firebase Auth).
 P0 Ge åtkomst till Google Calendar (OAuth, scope calendar eller calendar.events + calendar.readonly). Åtkomsten ska bestå mellan sessioner utan nya inloggningar (refresh token hanteras på servern, se PROJECT.md).
 P0 Tydligt felläge om åtkomsten återkallats, med en knapp för att koppla om.
+P0 Kalendervalg (fas 0): användaren väljer vilka av sina Google-kalendrar som visas, även flera samtidigt (t.ex. jobb och privat i samma vy för att se krockar). Valet sparas lokalt per användare, standard är Googles `selected: true`. Det är en föregångare till spaces och samlad vy (fas 2) och ersätts av dem då.
 P1 Onboarding: vid första inloggning importeras alla kalendrar. En familj skapas per kalender (med kalenderns färg), och användaren får ett förslag på spaces som går att justera.
 Acceptanskriterier
 

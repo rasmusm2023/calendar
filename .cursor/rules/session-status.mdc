@@ -1,0 +1,8 @@
+---
+description: Påminn om öppna manuella steg vid sessionsstart
+alwaysApply: true
+---
+
+# Sessionsstart
+
+I början av varje ny session, innan annat arbete: läs `docs/STATUS.md` och påminn användaren kort om alla manuella steg (M-nummer) som inte är avbockade, samt om kända problem som blockerar nästa steg. Fråga om de är gjorda och bocka av dem i filen när användaren bekräftar. Håll `docs/STATUS.md` uppdaterad när steg blir klara.

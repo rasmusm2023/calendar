@@ -36,7 +36,7 @@ async function signInViaEmulatorPopup(page: Page) {
 // TODO(fas 0, steg 0.11): Testet går igenom när Auth-emulatorn redan körts en stund, men misslyckas
 // konsekvent som FÖRSTA test efter kallstart av emulatorn: inloggningspopupen förblir öppen och
 // appen blir aldrig inloggad. Nästa test i samma körning (som också loggar in) går igenom, så det
-// verkar vara ett uppvärmningsproblem. Omklick-försök i testet räckte inte. Orsaken är inte utredd.
+// verkar vara ett uppvärmningsproblem. Omklick-försök i testet räckte inte. Se docs/STATUS.md (Kända problem) för utredningen.
 // Appens logik täcks under tiden av enhetstesterna (auth.test.tsx), men sessionsbeständighet efter
 // omladdning är bara verifierad manuellt mot varm emulator. Ta bort `fixme` när orsaken är löst.
 test.fixme('logga in med Google, förbli inloggad efter omladdning och logga ut', async ({
