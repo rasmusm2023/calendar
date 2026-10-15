@@ -128,6 +128,19 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
 
+  // Cloud Functions körs i Node och är det enda stället utöver src/lib/google som pratar med Google.
+  {
+    files: ['functions/**/*.{ts,mts}'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
+      ],
+    },
+  },
+
   // Vanliga JS-filer typkontrolleras inte.
   {
     files: ['**/*.js'],
