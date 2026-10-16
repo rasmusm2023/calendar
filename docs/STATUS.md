@@ -17,7 +17,7 @@ Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid för
 - [x] M9. Secrets `GOOGLE_CLIENT_ID` och `GOOGLE_CLIENT_SECRET` är satta och ihopparade (kontrollerat 2026-10-16, functions omdeployade). Tidigare hade de fel värden; det hittades vid första riktiga test. Kvar att kolla själv: Firebase-/Google-kontot har bara de OAuth-klienter du vill ha.
 - [x] M10. Skapa `.env.local` från `.env.example`.
 - [x] M11. JDK 21 installerat (för emulatorerna).
-- [ ] M12. Prova skapa mot riktiga Google (första riktiga POST/DELETE): `npm run dev`, logga in, klicka i veckovyn, skriv en titel och spara. Kontrollera i Google Calendar att händelsen finns, i rätt kalender och på rätt tid. Tryck "Ångra" i toasten och kontrollera att den försvinner. Prova också en heldagshändelse (månadsvyn) och en skapad i en dold kalender. Om något fallerar med CORS eller 4xx: skicka felet till mig.
+- [x] M12 (bekräftat av dig 2026-10-16: skapa, ångra, heldag och dold kalender fungerar). Prova skapa mot riktiga Google (första riktiga POST/DELETE): `npm run dev`, logga in, klicka i veckovyn, skriv en titel och spara. Kontrollera i Google Calendar att händelsen finns, i rätt kalender och på rätt tid. Tryck "Ångra" i toasten och kontrollera att den försvinner. Prova också en heldagshändelse (månadsvyn) och en skapad i en dold kalender. Om något fallerar med CORS eller 4xx: skicka felet till mig.
 
 ## Fas 0 – läge
 
@@ -48,7 +48,7 @@ Ordning bestämd 2026-10-16: mutationer först (1.1, 1.2, sedan skapa, dra och r
 - PROJECT.md är otydlig om var `settings` ligger (`users/{uid}` eller `users/{uid}/settings/{doc}`). Reglerna tillåter båda.
 - Dubbel frontmatter i `.cursor/rules/project.mdc`.
 - Google Calendar API mockas i E2E med Playwrights page.route i stället för MSW (PROJECT.md nämner MSW). Samma effekt i webbläsaren utan service worker. Föreslå uppdatering av PROJECT.md om du vill behålla det som standard.
-- Skrivande anrop är bara testade mot fejkad fetch. Att kontrollera mot riktiga Google i 1.5/1.6: att webbläsaren får skicka If-Match (CORS), att PATCH med dateTime: null/date: null byter mellan heldag och tidsbestämd, och att extendedProperties.private slås ihop vid PATCH.
+- POST och DELETE är verifierade mot riktiga Google (M12). PATCH är bara testad mot fejkad fetch. Att kontrollera mot riktiga Google i 1.6: att webbläsaren får skicka If-Match (CORS), att PATCH med dateTime: null/date: null byter mellan heldag och tidsbestämd, och att extendedProperties.private slås ihop vid PATCH.
 - Alla kommandon (1.6 och framåt) ska ta `cancelEventQueries` före den optimistiska ändringen och `refreshCalendarEvents` efter skrivningen (se `createEventCommand`), annars kan polling skriva över ändringen med gammal serverdata.
 - Utkastet i månadsvyn kan döljas under "+ fler" (popovern förankras då i rutnätets kant). Ej åtgärdat.
 - Händelsen i utkastet visar alltid "Ny händelse" medan du skriver (förhandsvisar inte titeln).
