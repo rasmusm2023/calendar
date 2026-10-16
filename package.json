@@ -24,6 +24,10 @@
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
+    "@fullcalendar/core": "^6.1.21",
+    "@fullcalendar/daygrid": "^6.1.21",
+    "@fullcalendar/react": "^6.1.21",
+    "@fullcalendar/timegrid": "^6.1.21",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.104.3",
     "class-variance-authority": "^0.7.1",

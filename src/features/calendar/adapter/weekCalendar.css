@@ -1,0 +1,33 @@
+/*
+ * Kopplar FullCalendars CSS-variabler till appens tema (Tailwind/shadcn-variablerna i index.css),
+ * så att ljust och mörkt tema följer med. Händelsernas färger sätts per händelse av resolveEventStyle.
+ */
+.sc-week-calendar {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--background);
+  --fc-neutral-bg-color: var(--muted);
+  --fc-neutral-text-color: var(--muted-foreground);
+  --fc-today-bg-color: color-mix(in oklch, var(--primary) 6%, transparent);
+  --fc-now-indicator-color: var(--destructive);
+  --fc-event-border-color: transparent;
+  --fc-non-business-color: var(--muted);
+
+  height: 100%;
+  color: var(--foreground);
+}
+
+.sc-week-calendar .fc {
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.sc-week-calendar .fc-col-header-cell-cushion,
+.sc-week-calendar .fc-timegrid-slot-label-cushion {
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.sc-week-calendar .fc-event:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
