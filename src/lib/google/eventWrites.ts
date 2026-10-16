@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { CalEvent, EventReminders } from '@/types'
 import type { GoogleClient, RequestOptions } from './client'
 import { GoogleApiError } from './errors'
@@ -15,7 +16,7 @@ import { googleEventSchema } from './types'
 
 /** Fält i svaret som vi använder. Samma som i `listEvents`, men för en enskild händelse. */
 const EVENT_RESOURCE_FIELDS =
-  'id,etag,status,summary,location,description,reminders,start,end,recurringEventId,extendedProperties/private'
+  'id,etag,status,summary,location,description,reminders,start,end,recurringEventId,originalStartTime,recurrence,extendedProperties/private'
 
 export interface EventRef {
   calendarId: string
@@ -41,6 +42,10 @@ export interface NewEvent extends EventTime {
   location?: string
   description?: string
   reminders?: EventReminders
+  /** Regler som gör händelsen till en serie (RRULE). Då krävs `timeZone` för tidsbestämda händelser. */
+  recurrence?: readonly string[]
+  /** Tidszonen som serien räknas i. Skickas med start och slut för tidsbestämda händelser. */
+  timeZone?: string
   familyId?: string
   important?: boolean
 }
@@ -54,6 +59,10 @@ export interface EventChanges {
   description?: string | null
   /** Hela påminnelselistan ersätts. `{ useDefault: true }` ger kalenderns standardpåminnelser. */
   reminders?: EventReminders
+  /** Hela regellistan ersätts. Används för att korta av eller återställa en serie. */
+  recurrence?: readonly string[]
+  /** Tidszon som skickas med start och slut när 	ime är tidsbestämd. Krävs av Google för tidsbestämda serier. */
+  timeZone?: string
   familyId?: string | null
   important?: boolean
 }
@@ -67,6 +76,11 @@ export interface PatchOptions extends WriteOptions {
   /** Händelsens etag, skickas som If-Match. */
   etag?: string
 }
+
+const instancesPageSchema = z.object({
+  items: z.array(z.unknown()).default([]),
+  nextPageToken: z.string().optional(),
+})
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuv0123456789'
 const ID_LENGTH = 26
@@ -101,6 +115,26 @@ function timeFields(time: EventTime, mode: 'insert' | 'patch') {
   }
 }
 
+/** Start och slut i en PATCH. Tidsbestämda händelser får med tidszonen om den angetts. */
+function patchTime(time: EventTime, timeZone: string | undefined) {
+  const fields = timeFields(time, 'patch')
+  if (time.allDay || timeZone === undefined) return fields
+  return {
+    start: { ...fields.start, timeZone },
+    end: { ...fields.end, timeZone },
+  }
+}
+
+/** Start och slut för en ny händelse. Tidsbestämda serier får med tidszonen, som Google kräver för dem. */
+function insertTime(event: NewEvent) {
+  const fields = timeFields(event, 'insert')
+  if (event.allDay || event.timeZone === undefined) return fields
+  return {
+    start: { ...fields.start, timeZone: event.timeZone },
+    end: { ...fields.end, timeZone: event.timeZone },
+  }
+}
+
 function parseEvent(raw: unknown, calendarId: string, timeZone: string): CalEvent {
   const parsed = googleEventSchema.safeParse(raw)
   if (!parsed.success) throw new GoogleApiError('badResponse')
@@ -125,7 +159,7 @@ export async function getEvent(
 ): Promise<CalEvent> {
   const raw = await client.getJson(
     eventPath(ref),
-    { fields: EVENT_RESOURCE_FIELDS },
+    { fields: EVENT_RESOURCE_FIELDS, timeZone: options.timeZone },
     signalOption(options),
   )
   return parseEvent(raw, ref.calendarId, options.timeZone)
@@ -150,7 +184,8 @@ export async function insertEvent(
     ...(event.location !== undefined && { location: event.location }),
     ...(event.description !== undefined && { description: event.description }),
     ...(event.reminders !== undefined && { reminders: event.reminders }),
-    ...timeFields(event, 'insert'),
+    ...(event.recurrence !== undefined && { recurrence: event.recurrence }),
+    ...insertTime(event),
     ...(Object.keys(privateProps).length > 0 && { extendedProperties: { private: privateProps } }),
   }
 
@@ -185,7 +220,8 @@ export async function patchEvent(
     ...(changes.location !== undefined && { location: changes.location }),
     ...(changes.description !== undefined && { description: changes.description }),
     ...(changes.reminders !== undefined && { reminders: changes.reminders }),
-    ...(changes.time !== undefined && timeFields(changes.time, 'patch')),
+    ...(changes.recurrence !== undefined && { recurrence: changes.recurrence }),
+    ...(changes.time !== undefined && patchTime(changes.time, changes.timeZone)),
     ...(Object.keys(privateProps).length > 0 && { extendedProperties: { private: privateProps } }),
   }
 
@@ -237,4 +273,41 @@ export async function moveEvent(
     ...signalOption(options),
   })
   return parseEvent(raw, destinationCalendarId, options.timeZone)
+}
+
+const INSTANCE_PAGE_SIZE = 250
+const MAX_INSTANCE_PAGES = 20
+
+/**
+ * Antal förekomster av en serie i ett intervall (inklusive borttagna, som också räknas mot COUNT). Behövs för att
+ * veta hur många som återstår när en serie delas ("denna och följande"). `timeMin` och `timeMax` är RFC 3339 med offset.
+ */
+export async function countInstances(
+  client: GoogleClient,
+  master: EventRef,
+  range: { timeMin: string; timeMax: string },
+  options: RequestOptions = {},
+): Promise<number> {
+  let count = 0
+  let pageToken: string | undefined
+  for (let page = 0; page < MAX_INSTANCE_PAGES; page += 1) {
+    const raw = await client.getJson(
+      `${eventPath(master)}/instances`,
+      {
+        timeMin: range.timeMin,
+        timeMax: range.timeMax,
+        showDeleted: 'true',
+        maxResults: String(INSTANCE_PAGE_SIZE),
+        fields: 'nextPageToken,items(id)',
+        ...(pageToken !== undefined && { pageToken }),
+      },
+      signalOption(options),
+    )
+    const parsed = instancesPageSchema.safeParse(raw)
+    if (!parsed.success) throw new GoogleApiError('badResponse')
+    count += parsed.data.items.length
+    pageToken = parsed.data.nextPageToken
+    if (pageToken === undefined) return count
+  }
+  throw new GoogleApiError('badResponse')
 }

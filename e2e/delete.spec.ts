@@ -38,11 +38,12 @@ async function openWeek(page: Page, setup?: (api: CalendarApiMock) => void) {
             reminders: { useDefault: false, overrides: [{ method: 'email', minutes: 60 }] },
           },
           {
-            id: 'w3_20261021',
+            id: 'w3',
             title: 'Veckomöte',
-            start: zonedTime(0, '15:00'),
-            end: zonedTime(0, '16:00'),
-            recurringEventId: 'w3',
+            start: zonedTime(-14, '15:00'),
+            end: zonedTime(-14, '16:00'),
+            recurrence: ['RRULE:FREQ=WEEKLY'],
+            timeZone: 'Europe/Stockholm',
           },
         ],
         readonly: [
@@ -247,22 +248,19 @@ test('en händelse i en skrivskyddad kalender går varken att ta bort eller dupl
   expect(api.writeRequests).toHaveLength(0)
 })
 
-test('en instans av en återkommande händelse går inte att ta bort, men kopian blir en vanlig händelse', async ({
+test('kopian av en förekomst av en återkommande händelse blir en vanlig händelse', async ({
   page,
 }) => {
   const api = await openWeek(page)
 
   await eventBlock(page, 'Veckomöte').focus()
-  await page.keyboard.press('Delete')
-  await page.waitForTimeout(300)
-  expect(deletes(api)).toHaveLength(0)
-  await expect(eventBlock(page, 'Veckomöte')).toHaveCount(1)
-
   await page.keyboard.press('Control+d')
+
   await expect(eventBlock(page, 'Veckomöte')).toHaveCount(2)
   await expect.poll(() => posts(api).length).toBe(1)
-  expect(Object.keys(posts(api)[0]?.body as object)).not.toContain('recurringEventId')
-  expect(
-    findByTitle(api, 'Veckomöte').filter((event) => event.recurringEventId === undefined),
-  ).toHaveLength(1)
+  const body = posts(api)[0]?.body as Record<string, unknown>
+  expect(Object.keys(body)).not.toContain('recurringEventId')
+  expect(Object.keys(body)).not.toContain('recurrence')
+  // Ingen fråga om serien: en kopia är alltid en egen händelse.
+  await expect(page.getByTestId('recurrence-scope')).toHaveCount(0)
 })

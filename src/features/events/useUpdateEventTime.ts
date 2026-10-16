@@ -5,7 +5,9 @@ import { useGoogleAccess } from '@/features/google-access'
 import { useUndo } from '@/features/undo'
 import type { EventTime } from '@/lib/google'
 import { findEventInCache } from './eventsCache'
+import { isSeriesScope, type RecurringScope } from './recurringScope'
 import { updateEventTimeCommand } from './updateEventTimeCommand'
+import { updateSeriesCommand } from './updateSeriesCommand'
 
 export interface UpdateEventTimeRequest {
   calendarId: string
@@ -14,6 +16,11 @@ export interface UpdateEventTimeRequest {
   kind: 'move' | 'resize'
   /** Den nya tiden. */
   to: EventTime
+  /**
+   * Vad ändringen gäller för en förekomst av en återkommande händelse. Utan den, eller med `this`, ändras bara
+   * förekomsten.
+   */
+  scope?: RecurringScope
 }
 
 /**
@@ -30,18 +37,18 @@ export function useUpdateEventTime(timeZone: string): (request: UpdateEventTimeR
   const { t } = useTranslation()
 
   return useCallback(
-    ({ calendarId, eventId, kind, to }) => {
+    ({ calendarId, eventId, kind, to, scope = 'this' }) => {
       const current = findEventInCache(queryClient, { calendarId, eventId })
       if (current === undefined) return
       const title = current.title === '' ? t('event.untitled') : current.title
       const label = t(kind === 'move' ? 'event.move.label' : 'event.resize.label', { title })
+      const context = { client, queryClient, timeZone, label }
+      if (isSeriesScope(scope) && current.recurringEventId !== undefined) {
+        void execute(updateSeriesCommand(context, { instance: current, scope, edit: { time: to } }))
+        return
+      }
       const from: EventTime = { start: current.start, end: current.end, allDay: current.allDay }
-      void execute(
-        updateEventTimeCommand(
-          { client, queryClient, timeZone, label },
-          { calendarId, eventId, from, to },
-        ),
-      )
+      void execute(updateEventTimeCommand(context, { calendarId, eventId, from, to }))
     },
     [client, queryClient, timeZone, execute, t],
   )

@@ -50,7 +50,7 @@ function idOf(raw: unknown): string | undefined {
 
 function mapTime(
   time: GoogleEventTime,
-  label: 'start' | 'end',
+  label: 'start' | 'end' | 'originalStartTime',
   ctx: MapEventContext,
 ): { value: string; allDay: boolean } {
   const { date, dateTime } = time
@@ -124,6 +124,18 @@ export function mapGoogleEvent(raw: GoogleEvent, ctx: MapEventContext): CalEvent
   const reminders = mapReminders(raw.reminders)
   if (reminders !== undefined) event.reminders = reminders
   if (raw.recurringEventId !== undefined) event.recurringEventId = raw.recurringEventId
+  if (raw.originalStartTime !== undefined) {
+    try {
+      event.originalStart = mapTime(raw.originalStartTime, 'originalStartTime', ctx).value
+    } catch {
+      // En trasig ursprungstid ska inte stoppa hela händelsen. Den behövs bara för "denna och följande".
+    }
+  }
+  if (raw.recurrence !== undefined) {
+    event.recurrence = raw.recurrence
+    // Tidszonen behövs bara för serier (huvudhändelsen), för att kunna skapa en ny serie i samma zon.
+    if (raw.start.timeZone !== undefined) event.timeZone = raw.start.timeZone
+  }
   if (familyId !== undefined && familyId !== '') event.familyId = familyId
   return event
 }

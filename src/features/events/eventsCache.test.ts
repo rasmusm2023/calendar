@@ -7,7 +7,9 @@ import {
   addEventToCache,
   cancelEventQueries,
   findEventInCache,
+  findSeriesInstances,
   removeEventFromCache,
+  replaceEventsInCache,
   updateEventInCache,
 } from './eventsCache'
 import { queryKeys } from './queryKeys'
@@ -54,6 +56,50 @@ describe('eventsCache', () => {
     return queryClient.getQueryData<EventsResult>(key)?.events.map((e) => e.id)
   }
 
+  describe('serier', () => {
+    const instance = (id: string, series: string, overrides: Partial<CalEvent> = {}) =>
+      event(id, { recurringEventId: series, ...overrides })
+
+    it('hittar förekomsterna av en serie över flera intervall, utan dubbletter och utan andra serier', () => {
+      const spanning = instance('i2', 's1', {
+        start: '2026-10-25T23:00:00+01:00',
+        end: '2026-10-26T01:00:00+01:00',
+      })
+      queryClient.setQueryData(keyFor('a'), result(instance('i1', 's1'), event('plain'), spanning))
+      queryClient.setQueryData(keyFor('a', NEXT_WEEK), result(spanning, instance('x', 's2')))
+
+      const found = findSeriesInstances(queryClient, 'a', 's1')
+
+      expect(found.map((e) => e.id).toSorted()).toEqual(['i1', 'i2'])
+    })
+
+    it('hittar inget i en annan kalender', () => {
+      queryClient.setQueryData(keyFor('a'), result(instance('i1', 's1')))
+      expect(findSeriesInstances(queryClient, 'b', 's1')).toEqual([])
+    })
+
+    it('byter ut händelser: tar bort det som inte finns kvar och lägger in det nya', () => {
+      const one = instance('i1', 's1')
+      const two = instance('i2', 's1')
+      queryClient.setQueryData(keyFor('a'), result(one, two, event('plain')))
+
+      replaceEventsInCache(queryClient, [one, two], [{ ...two, title: 'Ny' }])
+
+      expect(
+        queryClient.getQueryData<EventsResult>(keyFor('a'))?.events.map((e) => e.title),
+      ).toEqual(expect.arrayContaining(['plain', 'Ny']))
+      expect(ids(keyFor('a'))?.toSorted()).toEqual(['i2', 'plain'])
+    })
+
+    it('kan bara lägga tillbaka, vilket ångrar en borttagning', () => {
+      const one = instance('i1', 's1')
+      queryClient.setQueryData(keyFor('a'), result())
+
+      replaceEventsInCache(queryClient, [], [one])
+
+      expect(ids(keyFor('a'))).toEqual(['i1'])
+    })
+  })
   describe('addEventToCache', () => {
     it('lägger in händelsen i intervallet den hör hemma i', () => {
       queryClient.setQueryData(keyFor('a'), result(event('old')))

@@ -11,6 +11,7 @@ export {
   type WriteRequest,
 } from './client'
 export {
+  countInstances,
   deleteEvent,
   generateEventId,
   getEvent,
@@ -25,6 +26,13 @@ export {
   type PatchOptions,
   type WriteOptions,
 } from './eventWrites'
+export {
+  continuationRules,
+  matchUntilToKind,
+  ruleCount,
+  shiftRecurrenceDays,
+  truncateRecurrence,
+} from './recurrence'
 export {
   listCalendars,
   listEvents,

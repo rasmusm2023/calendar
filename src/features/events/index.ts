@@ -34,3 +34,5 @@ export {
 } from './EventEditPanel'
 export { useDeleteEvent } from './useDeleteEvent'
 export { useDuplicateEvent } from './useDuplicateEvent'
+export { RecurrenceScopeDialog, type RecurrenceScopeDialogProps } from './RecurrenceScopeDialog'
+export { isRecurringInstance, type RecurringScope } from './recurringScope'

@@ -6,6 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   EventEditPanel,
   QuickCreatePopover,
+  RecurrenceScopeDialog,
+  isRecurringInstance,
   isWritableCalendar,
   pickDefaultCalendarId,
   useCalendars,
@@ -19,7 +21,9 @@ import {
   type CreateEventInput,
   type EventReadOnlyReason,
   type QuickCreateChange,
+  type RecurringScope,
   type StyleContext,
+  type UpdateEventTimeRequest,
 } from '@/features/events'
 import { getBrowserTimeZone } from '@/lib/dates'
 import { GoogleAccessError, GoogleApiError, type EventTime } from '@/lib/google'
@@ -43,6 +47,12 @@ interface Draft {
   /** Tiden som formuläret beskriver just nu. */
   time: EventTime
   calendarId: string
+}
+
+/** En ändring av en förekomst av en återkommande händelse som väntar på svar på vad den gäller. */
+interface ScopeQuestion {
+  mode: 'edit' | 'delete'
+  run: (scope: RecurringScope) => void
 }
 
 type LoadErrorKey = 'network' | 'unavailable' | 'rateLimited' | 'generic'
@@ -183,24 +193,47 @@ export function CalendarPage() {
     [events],
   )
   let readOnlyReason: EventReadOnlyReason | undefined
-  if (editing?.recurringEventId !== undefined) readOnlyReason = 'recurring'
-  else if (editing !== null && !editableCalendarIds.has(editing.calendarId))
-    readOnlyReason = 'calendar'
-  // Ta bort och duplicera kräver att kalendern går att skriva i. Instanser av återkommande händelser går
-  // att duplicera (kopian blir en vanlig händelse) men inte att ta bort förrän 1.9.
+  if (editing !== null && !editableCalendarIds.has(editing.calendarId)) readOnlyReason = 'calendar'
+  // Ta bort och duplicera kräver att kalendern går att skriva i. En kopia av en förekomst blir en vanlig händelse.
   const findEvent = useCallback(
     (ref: { calendarId: string; eventId: string }) =>
       events.find((e) => e.calendarId === ref.calendarId && e.id === ref.eventId),
     [events],
   )
+  // Ändringar av en förekomst av en återkommande händelse väntar på svaret om vad de gäller (PRD 6.7).
+  const [askScope, setAskScope] = useState<ScopeQuestion | null>(null)
   const requestDelete = useCallback(
     (ref: { calendarId: string; eventId: string }) => {
       const found = findEvent(ref)
-      if (found === undefined || found.recurringEventId !== undefined) return
-      if (!editableCalendarIds.has(found.calendarId)) return
+      if (found === undefined || !editableCalendarIds.has(found.calendarId)) return
+      if (isRecurringInstance(found)) {
+        setAskScope({
+          mode: 'delete',
+          run: (scope) => {
+            deleteEvent(ref, scope)
+          },
+        })
+        return
+      }
       deleteEvent(ref)
     },
     [findEvent, editableCalendarIds, deleteEvent],
+  )
+  const requestTimeChange = useCallback(
+    (request: UpdateEventTimeRequest) => {
+      const found = findEvent(request)
+      if (found !== undefined && isRecurringInstance(found)) {
+        setAskScope({
+          mode: 'edit',
+          run: (scope) => {
+            updateEventTime({ ...request, scope })
+          },
+        })
+        return
+      }
+      updateEventTime(request)
+    },
+    [findEvent, updateEventTime],
   )
   const requestDuplicate = useCallback(
     (ref: { calendarId: string; eventId: string }, time?: EventTime) => {
@@ -377,7 +410,7 @@ export function CalendarPage() {
               draft={gridDraft}
               onDraftElement={draftAnchor.setElement}
               editableCalendarIds={editableCalendarIds}
-              onEventTimeChange={updateEventTime}
+              onEventTimeChange={requestTimeChange}
               onEventClick={openEvent}
               onEventDelete={requestDelete}
               onEventDuplicate={requestDuplicate}
@@ -407,12 +440,12 @@ export function CalendarPage() {
           calendar={allCalendars.find((c) => c.id === editing.calendarId)}
           timeZone={timeZone}
           {...(readOnlyReason !== undefined && { readOnlyReason })}
-          onSave={(edit) => {
-            updateEvent({ calendarId: editing.calendarId, eventId: editing.id, edit })
+          onSave={(edit, scope) => {
+            updateEvent({ calendarId: editing.calendarId, eventId: editing.id, edit, scope })
           }}
           {...(readOnlyReason === undefined && {
-            onDelete: () => {
-              requestDelete({ calendarId: editing.calendarId, eventId: editing.id })
+            onDelete: (scope) => {
+              deleteEvent({ calendarId: editing.calendarId, eventId: editing.id }, scope)
             },
           })}
           {...(editableCalendarIds.has(editing.calendarId) && {
@@ -421,6 +454,18 @@ export function CalendarPage() {
             },
           })}
           onClose={closeEditing}
+        />
+      )}
+      {askScope !== null && (
+        <RecurrenceScopeDialog
+          mode={askScope.mode}
+          onConfirm={(scope) => {
+            askScope.run(scope)
+            setAskScope(null)
+          }}
+          onCancel={() => {
+            setAskScope(null)
+          }}
         />
       )}
     </div>

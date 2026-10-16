@@ -36,6 +36,12 @@ export interface CalEvent {
   reminders?: EventReminders
   /** Satt på instanser av en återkommande händelse (Google expanderar åt oss, singleEvents=true). */
   recurringEventId?: string
+  /** Instans av en serie: den ursprungliga starttiden (samma form som start), även om instansen flyttats. */
+  originalStart?: string
+  /** Bara på huvudhändelsen för en serie: reglerna (RRULE, EXDATE, ...), som Google skickar dem. */
+  recurrence?: readonly string[]
+  /** Tidszonen som händelsens tider räknas i hos Google, om den angetts. Behövs för nya serier. */
+  timeZone?: string
   /** Explicit familj från extendedProperties.private.scFamilyId. Används från Fas 2. */
   familyId?: string
   /** extendedProperties.private.scImportant === "1". */

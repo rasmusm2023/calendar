@@ -83,12 +83,28 @@ describe('toFullCalendarEvents', () => {
     expect(locked?.editable).toBe(false)
   })
 
-  it('låter inte instanser av återkommande händelser flyttas ännu', () => {
+  it('låter förekomster av återkommande händelser flyttas, och markerar dem som återkommande', () => {
+    const [instance, plain] = toFullCalendarEvents(
+      [
+        { ...TIMED, recurringEventId: 'series' },
+        { ...TIMED, id: 'plain' },
+      ],
+      { calendarColors: COLORS },
+      '',
+      new Set(['work']),
+    )
+
+    expect(instance?.editable).toBe(true)
+    expect(instance?.extendedProps).toMatchObject({ recurring: true })
+    expect(plain?.extendedProps).toMatchObject({ recurring: false })
+  })
+
+  it('låser förekomster i en skrivskyddad kalender', () => {
     const [instance] = toFullCalendarEvents(
       [{ ...TIMED, recurringEventId: 'series' }],
       { calendarColors: COLORS },
       '',
-      new Set(['work']),
+      new Set(['other']),
     )
 
     expect(instance?.editable).toBe(false)

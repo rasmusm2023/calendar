@@ -55,7 +55,11 @@ const MONTH_VIEW = 'dayGridMonth'
 /** Det vi lagt i extendedProps för varje händelse (se 	oFullCalendarEvents). */
 const CALENDAR_ID_ATTRIBUTE = 'scCalendarId'
 const EVENT_ID_ATTRIBUTE = 'scEventId'
-const eventPropsSchema = z.object({ calendarId: z.string(), eventId: z.string() })
+const eventPropsSchema = z.object({
+  calendarId: z.string(),
+  eventId: z.string(),
+  recurring: z.boolean().default(false),
+})
 
 /** Snäppning av markeringar i tidsrutnätet (PRD 6.4: 15 min). */
 const SNAP_DURATION = '00:15:00'
@@ -280,7 +284,9 @@ export function CalendarGrid({
   const handleEventClick = useCallback(
     (arg: EventClickArg) => {
       const props = eventPropsSchema.safeParse(arg.event.extendedProps)
-      if (props.success) onEventClick?.(props.data)
+      if (props.success) {
+        onEventClick?.({ calendarId: props.data.calendarId, eventId: props.data.eventId })
+      }
     },
     [onEventClick],
   )
@@ -308,13 +314,17 @@ export function CalendarGrid({
         arg.revert()
         return
       }
+      const ref = { calendarId: props.data.calendarId, eventId: props.data.eventId }
       // Alt+dra duplicerar: originalet ligger kvar och kopian hamnar där man släppte.
       if (kind === 'move' && arg.jsEvent.altKey && onEventCopy) {
         arg.revert()
-        onEventCopy(props.data, to)
+        onEventCopy(ref, to)
         return
       }
-      onEventTimeChange({ ...props.data, kind, to })
+      // En förekomst av en återkommande händelse: sidan frågar vad ändringen gäller. Tills dess ligger den kvar,
+      // och Avbryt ska lämna den där den var. Ändringen ritas om från de nya händelserna när den görs.
+      if (props.data.recurring) arg.revert()
+      onEventTimeChange({ ...ref, kind, to })
     },
     [dragCancel, onEventTimeChange, onEventCopy],
   )

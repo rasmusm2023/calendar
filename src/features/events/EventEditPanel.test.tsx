@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { describe, expect, it, vi } from 'vitest'
@@ -72,7 +72,7 @@ describe('EventEditPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Spara' }))
 
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({ title: 'Ny titel' })
+    expect(onSave).toHaveBeenCalledExactlyOnceWith({ title: 'Ny titel' }, 'this')
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -91,7 +91,7 @@ describe('EventEditPanel', () => {
     await user.clear(location)
     await user.type(location, 'Rum 7{Enter}')
 
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({ location: 'Rum 7' })
+    expect(onSave).toHaveBeenCalledExactlyOnceWith({ location: 'Rum 7' }, 'this')
   })
 
   it('tömmer plats och beskrivning med tom text', async () => {
@@ -101,7 +101,7 @@ describe('EventEditPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Spara' }))
 
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({ location: '', description: '' })
+    expect(onSave).toHaveBeenCalledExactlyOnceWith({ location: '', description: '' }, 'this')
   })
 
   it('ändrar tiden och behåller längden när starten flyttas', async () => {
@@ -112,13 +112,16 @@ describe('EventEditPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Spara' }))
 
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({
-      time: {
-        start: '2026-10-21T13:30:00+02:00',
-        end: '2026-10-21T14:30:00+02:00',
-        allDay: false,
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(
+      {
+        time: {
+          start: '2026-10-21T13:30:00+02:00',
+          end: '2026-10-21T14:30:00+02:00',
+          allDay: false,
+        },
       },
-    })
+      'this',
+    )
   })
 
   it('gör en händelse till heldag', async () => {
@@ -127,9 +130,12 @@ describe('EventEditPanel', () => {
     await user.click(await screen.findByRole('checkbox', { name: 'Heldag' }))
     await user.click(screen.getByRole('button', { name: 'Spara' }))
 
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({
-      time: { start: '2026-10-21', end: '2026-10-22', allDay: true },
-    })
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(
+      {
+        time: { start: '2026-10-21', end: '2026-10-22', allDay: true },
+      },
+      'this',
+    )
   })
 
   it('spärrar sparande när slutet ligger före början', async () => {
@@ -152,9 +158,12 @@ describe('EventEditPanel', () => {
     await user.selectOptions(screen.getByLabelText('Metod, påminnelse 1'), 'email')
     await user.click(screen.getByRole('button', { name: 'Spara' }))
 
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({
-      reminders: { useDefault: false, overrides: [{ method: 'email', minutes: 60 }] },
-    })
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(
+      {
+        reminders: { useDefault: false, overrides: [{ method: 'email', minutes: 60 }] },
+      },
+      'this',
+    )
   })
 
   it('lägger till och tar bort påminnelser', async () => {
@@ -170,9 +179,12 @@ describe('EventEditPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Ta bort påminnelse 1' }))
     await user.click(screen.getByRole('button', { name: 'Spara' }))
 
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({
-      reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 10 }] },
-    })
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(
+      {
+        reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 10 }] },
+      },
+      'this',
+    )
   })
 
   it('visar en egen tid som inte finns bland valen', async () => {
@@ -219,7 +231,7 @@ describe('EventEditPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Ta bort' }))
 
     expect(onDuplicate).toHaveBeenCalledOnce()
-    expect(onDelete).toHaveBeenCalledOnce()
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith('this')
     expect(onClose).toHaveBeenCalledTimes(2)
     // Det som skrivits men inte sparats följer inte med.
     expect(onSave).not.toHaveBeenCalled()
@@ -233,15 +245,78 @@ describe('EventEditPanel', () => {
     expect(screen.queryByRole('button', { name: 'Ta bort' })).not.toBeInTheDocument()
   })
 
-  it('går att duplicera men inte ta bort en instans av en återkommande händelse', async () => {
-    await renderPanel({
-      readOnlyReason: 'recurring',
-      onDelete: vi.fn(),
-      onDuplicate: vi.fn(),
+  describe('förekomst av en återkommande händelse', () => {
+    const INSTANCE: CalEvent = { ...EVENT, id: 'm1_20261021', recurringEventId: 'm1' }
+
+    it('frågar vad ändringen gäller innan den sparas, och skickar svaret med', async () => {
+      const { onSave, onClose, user } = await renderPanel({ event: INSTANCE })
+      await user.type(await screen.findByRole('textbox', { name: 'Titel' }), '!')
+
+      await user.click(screen.getByRole('button', { name: 'Spara' }))
+
+      expect(onSave).not.toHaveBeenCalled()
+      const dialog = await screen.findByRole('dialog', { name: 'Ändra återkommande händelse' })
+      expect(within(dialog).getByRole('radio', { name: 'Bara den här händelsen' })).toBeChecked()
+      await user.click(
+        within(dialog).getByRole('radio', { name: 'Den här och följande händelser' }),
+      )
+      await user.click(within(dialog).getByRole('button', { name: 'OK' }))
+
+      expect(onSave).toHaveBeenCalledExactlyOnceWith({ title: 'Planering!' }, 'following')
+      expect(onClose).toHaveBeenCalledOnce()
     })
 
-    expect(await screen.findByRole('button', { name: 'Duplicera' })).toBeEnabled()
-    expect(screen.queryByRole('button', { name: 'Ta bort' })).not.toBeInTheDocument()
+    it('behåller panelen och det som skrivits när man avbryter frågan', async () => {
+      const { onSave, onClose, user } = await renderPanel({ event: INSTANCE })
+      await user.type(await screen.findByRole('textbox', { name: 'Titel' }), '!')
+      await user.click(screen.getByRole('button', { name: 'Spara' }))
+
+      await user.click(
+        within(
+          await screen.findByRole('dialog', { name: 'Ändra återkommande händelse' }),
+        ).getByRole('button', { name: 'Avbryt' }),
+      )
+
+      expect(onSave).not.toHaveBeenCalled()
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByRole('textbox', { name: 'Titel' })).toHaveValue('Planering!')
+    })
+
+    it('stänger bara frågan med Esc, inte panelen', async () => {
+      const { onClose, user } = await renderPanel({ event: INSTANCE })
+      await user.type(await screen.findByRole('textbox', { name: 'Titel' }), '!')
+      await user.click(screen.getByRole('button', { name: 'Spara' }))
+      await screen.findByRole('dialog', { name: 'Ändra återkommande händelse' })
+
+      await user.keyboard('{Escape}')
+
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.queryByRole('dialog', { name: 'Ändra återkommande händelse' })).toBeNull()
+      expect(screen.getByRole('dialog', { name: 'Redigera händelse' })).toBeVisible()
+    })
+
+    it('frågar vad borttagningen gäller', async () => {
+      const onDelete = vi.fn()
+      const { onClose, user } = await renderPanel({ event: INSTANCE, onDelete })
+
+      await user.click(await screen.findByRole('button', { name: 'Ta bort' }))
+      expect(onDelete).not.toHaveBeenCalled()
+      const dialog = await screen.findByRole('dialog', { name: 'Ta bort återkommande händelse' })
+      await user.click(within(dialog).getByRole('radio', { name: 'Alla händelser' }))
+      await user.click(within(dialog).getByRole('button', { name: 'OK' }))
+
+      expect(onDelete).toHaveBeenCalledExactlyOnceWith('all')
+      expect(onClose).toHaveBeenCalledOnce()
+    })
+
+    it('frågar inte när inget ändrats, och inte för vanliga händelser', async () => {
+      const { onSave, onClose, user } = await renderPanel({ event: INSTANCE })
+      await user.click(await screen.findByRole('button', { name: 'Spara' }))
+
+      expect(onSave).not.toHaveBeenCalled()
+      expect(onClose).toHaveBeenCalledOnce()
+      expect(screen.queryByRole('dialog', { name: 'Ändra återkommande händelse' })).toBeNull()
+    })
   })
 
   it('är låst och utan spara-knapp när kalendern är skrivskyddad', async () => {
@@ -252,13 +327,6 @@ describe('EventEditPanel', () => {
     expect(screen.getByRole('textbox', { name: 'Titel' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Spara' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Stäng' })).toBeEnabled()
-  })
-
-  it('är låst för en instans av en återkommande händelse', async () => {
-    await renderPanel({ readOnlyReason: 'recurring' })
-
-    expect(await screen.findByRole('status')).toHaveTextContent('Återkommande')
-    expect(screen.getByRole('textbox', { name: 'Plats' })).toBeDisabled()
   })
 
   it('påverkas inte av att händelsen uppdateras medan panelen är öppen', async () => {

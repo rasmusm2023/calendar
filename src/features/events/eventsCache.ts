@@ -107,6 +107,41 @@ export function removeEventFromCache(
   }
 }
 
+/** Alla förekomster av en serie som ligger i cachen (utan dubbletter över intervall). */
+export function findSeriesInstances(
+  queryClient: QueryClient,
+  calendarId: string,
+  seriesId: string,
+): CalEvent[] {
+  const found = new Map<string, CalEvent>()
+  for (const { key } of entriesFor(queryClient, calendarId)) {
+    for (const event of queryClient.getQueryData<EventsResult>(key)?.events ?? []) {
+      if (event.recurringEventId === seriesId) found.set(event.id, event)
+    }
+  }
+  return [...found.values()]
+}
+
+/**
+ * Byter ut 
+emove mot dd i cachen: händelser i 
+emove som inte finns i dd tas bort, och alla i dd
+ * läggs in (eller ersätter den som har samma id). Används för ändringar av flera förekomster i en serie, där
+ * ångra och återställning är samma byte åt andra hållet.
+ */
+export function replaceEventsInCache(
+  queryClient: QueryClient,
+  remove: readonly CalEvent[],
+  add: readonly CalEvent[],
+): void {
+  const keep = new Set(add.map((event) => event.id))
+  for (const event of remove) {
+    if (!keep.has(event.id)) {
+      removeEventFromCache(queryClient, { calendarId: event.calendarId, eventId: event.id })
+    }
+  }
+  for (const event of add) addEventToCache(queryClient, event)
+}
 /**
  * Hämtar om en kalenders händelser från Google. Anropas efter en lyckad (eller återställd) skrivning, så att
  * det vi visar till sist är det Google har. Pågående hämtningar avbryts inte här: det görs före ändringen

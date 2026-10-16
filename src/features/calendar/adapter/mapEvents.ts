@@ -17,8 +17,8 @@ const NO_CALENDARS: ReadonlySet<string> = new Set()
  * Tiderna är ISO-strängar och går vidare utan omräkning. För heldagar är `end` exklusivt hos både Google och
  * FullCalendar.
  *
- * Bara händelser i `editableCalendarIds` går att dra och ändra längd på. Instanser av återkommande händelser
- * går inte det förrän valet "Bara denna / Denna och följande / Alla" finns (steg 1.9).
+ * Bara händelser i `editableCalendarIds` går att dra och ändra längd på. För förekomster av återkommande
+ * händelser sätts `recurring`, så att rutnätet kan lämna över till sidan, som frågar vad ändringen gäller.
  */
 export function toFullCalendarEvents(
   events: readonly CalEvent[],
@@ -37,8 +37,12 @@ export function toFullCalendarEvents(
       backgroundColor: style.bg,
       borderColor: style.border,
       textColor: style.text,
-      editable: editableCalendarIds.has(event.calendarId) && event.recurringEventId === undefined,
-      extendedProps: { calendarId: event.calendarId, eventId: event.id },
+      editable: editableCalendarIds.has(event.calendarId),
+      extendedProps: {
+        calendarId: event.calendarId,
+        eventId: event.id,
+        recurring: event.recurringEventId !== undefined,
+      },
     }
   })
 }

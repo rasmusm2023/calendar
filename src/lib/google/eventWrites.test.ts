@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { GoogleClient, WriteMethod, WriteRequest } from './client'
+import type { GoogleClient, QueryParams, WriteMethod, WriteRequest } from './client'
 import { GoogleApiError } from './errors'
 import {
+  countInstances,
   deleteEvent,
   generateEventId,
   getEvent,
@@ -39,9 +40,11 @@ function fakeClient(
 ) {
   const writes: WriteCall[] = []
   const reads: string[] = []
+  const readParams: (QueryParams | undefined)[] = []
   const client: GoogleClient = {
-    getJson: vi.fn((path: string) => {
+    getJson: vi.fn((path: string, params?: QueryParams) => {
       reads.push(path)
+      readParams.push(params)
       return Promise.resolve().then(() => options.onRead?.(path) ?? googleEvent())
     }),
     requestJson: vi.fn((method: WriteMethod, path: string, request?: WriteRequest) => {
@@ -50,7 +53,7 @@ function fakeClient(
       return Promise.resolve().then(() => options.onWrite?.(call) ?? googleEvent())
     }),
   }
-  return { client, writes, reads }
+  return { client, writes, reads, readParams }
 }
 
 function body(call: WriteCall | undefined): Record<string, unknown> {
@@ -360,6 +363,133 @@ describe('getEvent', () => {
 
     expect(reads).toEqual(['/calendars/work%40group.calendar.google.com/events/ev1'])
     expect(event.title).toBe('Gympass')
+  })
+})
+
+describe('getEvent: tidszon', () => {
+  it('ber om tider i angiven tidszon, så att de stämmer med instanserna som visas', async () => {
+    const { client, readParams } = fakeClient()
+
+    await getEvent(client, REF, { timeZone: TZ })
+
+    expect(readParams[0]).toMatchObject({ timeZone: TZ })
+  })
+})
+
+describe('serier', () => {
+  const series: NewEvent = {
+    calendarId: 'primary',
+    id: 'serie1',
+    title: 'Veckomöte',
+    start: '2026-10-21T09:00:00+02:00',
+    end: '2026-10-21T10:00:00+02:00',
+    allDay: false,
+    recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=WE'],
+    timeZone: 'Europe/Stockholm',
+  }
+
+  it('skapar en tidsbestämd serie med regler och tidszon på start och slut', async () => {
+    const { client, writes } = fakeClient()
+
+    await insertEvent(client, series, { timeZone: TZ })
+
+    expect(body(writes[0])).toMatchObject({
+      recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=WE'],
+      start: { dateTime: '2026-10-21T09:00:00+02:00', timeZone: 'Europe/Stockholm' },
+      end: { dateTime: '2026-10-21T10:00:00+02:00', timeZone: 'Europe/Stockholm' },
+    })
+  })
+
+  it('skickar ingen tidszon för en heldagsserie', async () => {
+    const { client, writes } = fakeClient()
+
+    await insertEvent(
+      client,
+      { ...series, allDay: true, start: '2026-10-21', end: '2026-10-22' },
+      { timeZone: TZ },
+    )
+
+    expect(body(writes[0])).toMatchObject({
+      start: { date: '2026-10-21' },
+      end: { date: '2026-10-22' },
+    })
+    expect(JSON.stringify(body(writes[0]))).not.toContain('timeZone')
+  })
+
+  it('ersätter reglerna med en PATCH', async () => {
+    const { client, writes } = fakeClient()
+
+    await patchEvent(
+      client,
+      REF,
+      { recurrence: ['RRULE:FREQ=WEEKLY;UNTIL=20261020'] },
+      { timeZone: TZ },
+    )
+
+    expect(body(writes[0])).toEqual({ recurrence: ['RRULE:FREQ=WEEKLY;UNTIL=20261020'] })
+  })
+
+  it('skickar tidszonen med nya tider i en PATCH, men inte för heldag', async () => {
+    const { client, writes } = fakeClient()
+    const timed = { start: '2026-10-21T10:00:00+02:00', end: '2026-10-21T11:00:00+02:00' }
+
+    await patchEvent(
+      client,
+      REF,
+      { time: { ...timed, allDay: false }, timeZone: 'Europe/Stockholm' },
+      { timeZone: TZ },
+    )
+    await patchEvent(
+      client,
+      REF,
+      {
+        time: { start: '2026-10-21', end: '2026-10-22', allDay: true },
+        timeZone: 'Europe/Stockholm',
+      },
+      { timeZone: TZ },
+    )
+
+    expect(body(writes[0])).toMatchObject({
+      start: { dateTime: timed.start, date: null, timeZone: 'Europe/Stockholm' },
+      end: { dateTime: timed.end, date: null, timeZone: 'Europe/Stockholm' },
+    })
+    expect(JSON.stringify(body(writes[1]))).not.toContain('timeZone')
+  })
+
+  it('räknar förekomster i ett intervall, över flera sidor, inklusive borttagna', async () => {
+    let page = 0
+    const { client, reads, readParams } = fakeClient({
+      onRead: () => {
+        page += 1
+        return page === 1
+          ? { items: [{ id: 'a' }, { id: 'b' }], nextPageToken: 'nästa' }
+          : { items: [{ id: 'c' }] }
+      },
+    })
+
+    const count = await countInstances(
+      client,
+      REF,
+      { timeMin: '2026-10-01T00:00:00+02:00', timeMax: '2026-10-21T09:00:00+02:00' },
+      {},
+    )
+
+    expect(count).toBe(3)
+    expect(reads[0]).toBe('/calendars/work%40group.calendar.google.com/events/ev1/instances')
+    expect(readParams[0]).toMatchObject({
+      timeMin: '2026-10-01T00:00:00+02:00',
+      timeMax: '2026-10-21T09:00:00+02:00',
+      showDeleted: 'true',
+    })
+    expect(readParams[1]).toMatchObject({ pageToken: 'nästa' })
+  })
+
+  it('kastar badResponse för ett svar som inte går att tolka', async () => {
+    const { client } = fakeClient({ onRead: () => ({ items: 'inte en lista' }) })
+
+    await expect(countInstances(client, REF, { timeMin: 'a', timeMax: 'b' })).rejects.toMatchObject(
+      { kind: 'badResponse' },
+    )
   })
 })
 

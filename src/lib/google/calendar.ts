@@ -13,7 +13,7 @@ const DEFAULT_CONCURRENCY = 4
 const CALENDAR_LIST_FIELDS =
   'nextPageToken,items(id,summary,summaryOverride,backgroundColor,foregroundColor,selected,primary,deleted,accessRole,timeZone,defaultReminders)'
 const EVENT_FIELDS =
-  'nextPageToken,timeZone,items(id,etag,status,summary,location,description,reminders,start,end,recurringEventId,extendedProperties/private)'
+  'nextPageToken,timeZone,items(id,etag,status,summary,location,description,reminders,start,end,recurringEventId,originalStartTime,recurrence,extendedProperties/private)'
 
 export interface CalendarListResult {
   calendars: CalendarInfo[]

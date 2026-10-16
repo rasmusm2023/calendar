@@ -65,6 +65,10 @@ export const googleEventSchema = z.object({
   start: googleEventTimeSchema.optional(),
   end: googleEventTimeSchema.optional(),
   recurringEventId: z.string().optional(),
+  /** Bara på instanser: tiden de hade innan de eventuellt flyttades. */
+  originalStartTime: googleEventTimeSchema.optional(),
+  /** Bara på huvudhändelsen för en serie. */
+  recurrence: z.array(z.string()).optional(),
   extendedProperties: z
     .object({
       private: z.record(z.string(), z.string()).optional(),

@@ -320,6 +320,89 @@ describe('mapGoogleEvent', () => {
   })
 })
 
+describe('serier', () => {
+  it('mappar ursprungstiden på en instans, även när instansen flyttats', () => {
+    const [event] = parseEventsPage(
+      {
+        items: [
+          {
+            ...timedEvent,
+            recurringEventId: 'serie1',
+            originalStartTime: { dateTime: '2026-10-19T08:00:00+02:00' },
+          },
+        ],
+      },
+      ctx,
+    ).events
+
+    expect(event).toMatchObject({
+      recurringEventId: 'serie1',
+      originalStart: '2026-10-19T08:00:00+02:00',
+    })
+  })
+
+  it('mappar ursprungstiden för en heldagsinstans som datum', () => {
+    const [event] = parseEventsPage(
+      {
+        items: [
+          {
+            ...timedEvent,
+            start: { date: '2026-10-19' },
+            end: { date: '2026-10-20' },
+            recurringEventId: 'serie1',
+            originalStartTime: { date: '2026-10-19' },
+          },
+        ],
+      },
+      ctx,
+    ).events
+
+    expect(event?.originalStart).toBe('2026-10-19')
+  })
+
+  it('tappar inte händelsen om ursprungstiden är trasig', () => {
+    const page = parseEventsPage(
+      { items: [{ ...timedEvent, originalStartTime: { dateTime: 'inte en tid' } }] },
+      ctx,
+    )
+
+    expect(page.issues).toEqual([])
+    expect(page.events[0]?.originalStart).toBeUndefined()
+  })
+
+  it('mappar reglerna och tidszonen på huvudhändelsen för en serie', () => {
+    const [event] = parseEventsPage(
+      {
+        items: [
+          {
+            ...timedEvent,
+            start: { dateTime: '2026-10-19T09:00:00+02:00', timeZone: 'Europe/Stockholm' },
+            recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO', 'EXDATE:20261026'],
+          },
+        ],
+      },
+      ctx,
+    ).events
+
+    expect(event?.recurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=MO', 'EXDATE:20261026'])
+    expect(event?.timeZone).toBe('Europe/Stockholm')
+  })
+
+  it('lägger inte till regler eller tidszon på vanliga händelser', () => {
+    const [event] = parseEventsPage(
+      {
+        items: [
+          { ...timedEvent, start: { dateTime: '2026-10-19T09:00:00+02:00', timeZone: 'UTC' } },
+        ],
+      },
+      ctx,
+    ).events
+
+    expect(event).not.toHaveProperty('recurrence')
+    expect(event).not.toHaveProperty('timeZone')
+  })
+})
+
 describe('beskrivning och påminnelser', () => {
   it('mappar beskrivning och egna påminnelser, och släpper metoder appen inte hanterar', () => {
     const [event] = parseEventsPage(

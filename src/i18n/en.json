@@ -172,9 +172,20 @@
       "delete": "Delete",
       "duplicate": "Duplicate",
       "readOnly": {
-        "calendar": "You only have read access to this calendar, so the event can't be changed.",
-        "recurring": "Recurring events can't be changed yet."
+        "calendar": "You only have read access to this calendar, so the event can't be changed."
       }
+    },
+    "recurrence": {
+      "editTitle": "Edit recurring event",
+      "deleteTitle": "Delete recurring event",
+      "description": "Which events in the series does this apply to?",
+      "scope": {
+        "this": "This event only",
+        "following": "This and following events",
+        "all": "All events"
+      },
+      "confirm": "OK",
+      "cancel": "Cancel"
     },
     "reminder": {
       "heading": "Reminders",

@@ -172,9 +172,20 @@
       "delete": "Ta bort",
       "duplicate": "Duplicera",
       "readOnly": {
-        "calendar": "Du har bara läsrätt i den här kalendern, så händelsen går inte att ändra.",
-        "recurring": "Återkommande händelser går inte att ändra ännu."
+        "calendar": "Du har bara läsrätt i den här kalendern, så händelsen går inte att ändra."
       }
+    },
+    "recurrence": {
+      "editTitle": "Ändra återkommande händelse",
+      "deleteTitle": "Ta bort återkommande händelse",
+      "description": "Vilka händelser i serien gäller det?",
+      "scope": {
+        "this": "Bara den här händelsen",
+        "following": "Den här och följande händelser",
+        "all": "Alla händelser"
+      },
+      "confirm": "OK",
+      "cancel": "Avbryt"
     },
     "reminder": {
       "heading": "Påminnelser",

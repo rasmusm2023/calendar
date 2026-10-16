@@ -44,13 +44,6 @@ async function openWeek(page: Page, setup?: (api: CalendarApiMock) => void) {
       start: zonedTime(0, '12:00'),
       end: zonedTime(0, '13:00'),
     },
-    {
-      id: 'w3_20261021',
-      title: 'Veckomöte',
-      start: zonedTime(0, '15:00'),
-      end: zonedTime(0, '16:00'),
-      recurringEventId: 'w3',
-    },
   ]
   const api = await openCalendar(
     page,
@@ -334,15 +327,4 @@ test('en händelse i en skrivskyddad kalender öppnas låst', async ({ page }) =
   await dialog.getByRole('button', { name: 'Stäng' }).click()
   await expect(dialog).toBeHidden()
   expect(api.writeRequests).toHaveLength(0)
-})
-
-test('en instans av en återkommande händelse öppnas låst', async ({ page }) => {
-  await openWeek(page)
-
-  await eventBlock(page, 'Veckomöte').click()
-
-  const dialog = page.getByRole('dialog', { name: 'Händelse' })
-  await expect(dialog.getByRole('status')).toContainText('Återkommande')
-  await expect(dialog.getByRole('textbox', { name: 'Titel' })).toBeDisabled()
-  await expect(dialog.getByRole('button', { name: 'Spara' })).toHaveCount(0)
 })

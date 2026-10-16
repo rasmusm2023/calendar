@@ -7,12 +7,14 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { Textarea } from '@/components/ui/textarea'
 import type { CalendarInfo, CalEvent, EventReminders } from '@/types'
 import { remindersOf, sameReminders, type EventEdit } from './eventEdit'
+import { RecurrenceScopeDialog } from './RecurrenceScopeDialog'
+import { isRecurringInstance, type RecurringScope } from './recurringScope'
 import { ReminderEditor } from './ReminderEditor'
 import { TimeFields } from './TimeFields'
 import { useTimeForm } from './useTimeForm'
 
 /** Varför en händelse inte går att ändra. */
-export type EventReadOnlyReason = 'calendar' | 'recurring'
+export type EventReadOnlyReason = 'calendar'
 
 export interface EventEditPanelProps {
   event: CalEvent
@@ -21,10 +23,16 @@ export interface EventEditPanelProps {
   /** Satt när händelsen bara går att titta på. Då visas fälten låsta och utan spara-knapp. */
   readOnlyReason?: EventReadOnlyReason
   timeZone: string
-  /** Anropas med bara de fält som ändrats. Anropas inte om inget ändrats. */
-  onSave: (edit: EventEdit) => void
-  /** Tar bort händelsen. Utan den visas ingen Ta bort-knapp. Osparade ändringar i panelen kastas. */
-  onDelete?: () => void
+  /**
+   * Anropas med bara de fält som ändrats. Anropas inte om inget ändrats. För en förekomst av en återkommande
+   * händelse frågar panelen först vad ändringen gäller, och `scope` är svaret. För andra händelser är den `this`.
+   */
+  onSave: (edit: EventEdit, scope: RecurringScope) => void
+  /**
+   * Tar bort händelsen. Utan den visas ingen Ta bort-knapp. Osparade ändringar i panelen kastas. `scope` är som
+   * för `onSave`.
+   */
+  onDelete?: (scope: RecurringScope) => void
   /** Duplicerar händelsen som den var när panelen öppnades. Utan den visas ingen Duplicera-knapp. */
   onDuplicate?: () => void
   onClose: () => void
@@ -32,7 +40,9 @@ export interface EventEditPanelProps {
 
 /**
  * Redigeringspanelen för en befintlig händelse (PRD 6.5): titel, tid, heldag, plats, beskrivning och påminnelser.
- * Kalendern visas men byts inte här. Familj och "viktig" tillkommer i Fas 2, återkommande i 1.9.
+ * Kalendern visas men byts inte här. Familj och "viktig" tillkommer i Fas 2.
+ * Är händelsen en förekomst av en återkommande händelse frågar panelen vad Spara och Ta bort gäller (PRD 6.7).
+ * Frågan ligger över panelen, så att det man skrivit finns kvar om man ångrar sig.
  *
  * Panelen utgår från händelsen som den såg ut när den öppnades (anroparen ger den en ny `key` per händelse), så
  * en uppdatering från Google medan man skriver skriver inte över det man redan skrivit. Spara skickar bara de
@@ -62,6 +72,21 @@ export function EventEditPanel({
     timeZone,
   )
   const { time } = timeForm
+  const recurring = isRecurringInstance(initial)
+  /** Det som väntar på svar på frågan om vad ändringen gäller. */
+  const [asking, setAsking] = useState<
+    { kind: 'save'; edit: EventEdit } | { kind: 'delete' } | null
+  >(null)
+
+  const save = (edit: EventEdit, scope: RecurringScope) => {
+    onSave(edit, scope)
+    onClose()
+  }
+
+  const remove = (scope: RecurringScope) => {
+    onDelete?.(scope)
+    onClose()
+  }
 
   const submit = () => {
     if (readOnly) return
@@ -79,8 +104,9 @@ export function EventEditPanel({
     }
     if (!sameReminders(reminders, remindersOf(initial))) edit.reminders = reminders
 
-    if (Object.keys(edit).length > 0) onSave(edit)
-    onClose()
+    if (Object.keys(edit).length === 0) onClose()
+    else if (recurring) setAsking({ kind: 'save', edit })
+    else save(edit, 'this')
   }
 
   return (
@@ -182,8 +208,8 @@ export function EventEditPanel({
                   variant="outline"
                   className="text-destructive"
                   onClick={() => {
-                    onDelete()
-                    onClose()
+                    if (recurring) setAsking({ kind: 'delete' })
+                    else remove('this')
                   }}
                 >
                   {t('event.edit.delete')}
@@ -200,6 +226,19 @@ export function EventEditPanel({
             )}
           </div>
         </form>
+
+        {asking !== null && (
+          <RecurrenceScopeDialog
+            mode={asking.kind === 'save' ? 'edit' : 'delete'}
+            onConfirm={(scope) => {
+              if (asking.kind === 'save') save(asking.edit, scope)
+              else remove(scope)
+            }}
+            onCancel={() => {
+              setAsking(null)
+            }}
+          />
+        )}
       </SheetContent>
     </Sheet>
   )
