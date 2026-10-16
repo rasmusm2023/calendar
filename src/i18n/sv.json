@@ -23,6 +23,29 @@
     },
     "signOut": "Logga ut"
   },
+  "calendar": {
+    "label": "Veckokalender",
+    "weekNumber": "v{{number}}",
+    "toolbar": {
+      "label": "Veckonavigering",
+      "previous": "Föregående vecka",
+      "next": "Nästa vecka",
+      "today": "Idag"
+    },
+    "refreshing": "Uppdaterar…",
+    "noCalendars": "Du har inga kalendrar att visa.",
+    "loadError": {
+      "title": "Det gick inte att hämta dina kalendrar",
+      "network": "Kontrollera din internetanslutning och försök igen.",
+      "rateLimited": "Google har tillfälligt begränsat antalet anrop. Vänta en stund och försök igen.",
+      "generic": "Något gick fel när kalendrarna skulle hämtas. Försök igen."
+    },
+    "eventsError": {
+      "title": "Vissa kalendrar kunde inte hämtas",
+      "description": "{{failed}} av {{total}} kalendrar visas inte. Händelserna från de andra visas som vanligt."
+    },
+    "truncated": "Några händelser visas inte eftersom en kalender har väldigt många händelser den här veckan."
+  },
   "googleAccess": {
     "connect": {
       "title": "Koppla Google Calendar",

@@ -1,13 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '@/features/auth'
 import { GoogleAccessProvider } from '@/features/google-access'
 import { createI18n } from '@/i18n'
 import { createFakeAuthService, TEST_USER, type InitialAuth } from '@/test/fakeAuthService'
 import { createFakeGoogleAccessService } from '@/test/fakeGoogleAccessService'
 import { App } from './App'
+import { QueryProvider } from './QueryProvider'
 import { ConfigErrorScreen } from './ConfigErrorScreen'
 
 async function renderApp(initial: InitialAuth) {
@@ -18,7 +19,9 @@ async function renderApp(initial: InitialAuth) {
     <I18nextProvider i18n={i18n}>
       <AuthProvider service={fake.service}>
         <GoogleAccessProvider service={google.service}>
-          <App />
+          <QueryProvider>
+            <App />
+          </QueryProvider>
         </GoogleAccessProvider>
       </AuthProvider>
     </I18nextProvider>,
@@ -27,6 +30,17 @@ async function renderApp(initial: InitialAuth) {
 }
 
 describe('App', () => {
+  beforeEach(() => {
+    // Veckovyn hämtar kalendrar från Google. Här svarar vi med en tom lista.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(Response.json({ items: [] }))),
+    )
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('visar appen med översatt etikett för en inloggad användare', async () => {
     await renderApp(TEST_USER)
     expect(await screen.findByTestId('app-root')).toHaveAccessibleName('Spaces Calendar')

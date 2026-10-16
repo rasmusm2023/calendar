@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { AuthGate, SignOutButton } from '@/features/auth'
+import { WeekPage } from '@/features/calendar'
 import { GoogleAccessGate } from '@/features/google-access'
 
 export function App() {
@@ -8,13 +9,18 @@ export function App() {
   return (
     <AuthGate>
       <GoogleAccessGate>
-        <div className="flex min-h-svh flex-col">
+        <div className="flex h-svh flex-col">
           <header className="flex items-center justify-between border-b px-4 py-2">
             <span className="font-semibold">{t('app.name')}</span>
             <SignOutButton />
           </header>
-          {/* Platshållare. Veckovyn tillkommer i senare steg. */}
-          <main data-testid="app-root" aria-label={t('app.name')} className="flex-1" />
+          <main
+            data-testid="app-root"
+            aria-label={t('app.name')}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <WeekPage />
+          </main>
         </div>
       </GoogleAccessGate>
     </AuthGate>

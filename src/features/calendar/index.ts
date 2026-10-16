@@ -1,1 +1,1 @@
-export { WeekCalendar, type WeekCalendarProps } from './adapter/WeekCalendar'
+export { WeekPage } from './WeekPage'

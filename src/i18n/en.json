@@ -23,6 +23,29 @@
     },
     "signOut": "Sign out"
   },
+  "calendar": {
+    "label": "Week calendar",
+    "weekNumber": "w{{number}}",
+    "toolbar": {
+      "label": "Week navigation",
+      "previous": "Previous week",
+      "next": "Next week",
+      "today": "Today"
+    },
+    "refreshing": "Updating…",
+    "noCalendars": "You have no calendars to show.",
+    "loadError": {
+      "title": "Could not load your calendars",
+      "network": "Check your internet connection and try again.",
+      "rateLimited": "Google has temporarily limited the number of requests. Wait a moment and try again.",
+      "generic": "Something went wrong while loading the calendars. Try again."
+    },
+    "eventsError": {
+      "title": "Some calendars could not be loaded",
+      "description": "{{failed}} of {{total}} calendars are not shown. Events from the others are shown as usual."
+    },
+    "truncated": "Some events are not shown because a calendar has a very large number of events this week."
+  },
   "googleAccess": {
     "connect": {
       "title": "Connect Google Calendar",
