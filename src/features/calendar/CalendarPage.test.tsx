@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '@/features/auth'
+import { UndoProvider } from '@/features/undo'
 import { createI18n } from '@/i18n'
 import { GoogleAccessError, GoogleApiError, type QueryParams } from '@/lib/google'
 import { createFakeAuthService, TEST_USER, type InitialAuth } from '@/test/fakeAuthService'
-import { setupFakeGoogleClient, type Responder } from '@/test/fakeGoogleClient'
+import { setupFakeGoogleClient, type Responder, type WriteResponder } from '@/test/fakeGoogleClient'
 import { TEST_CALENDAR_COLOR } from '@/test/fixtures'
 import { CalendarPage } from './CalendarPage'
 
@@ -35,6 +36,7 @@ interface Options {
   calendars?: Record<string, unknown>[]
   events?: (calendarId: string, params: QueryParams) => unknown
   responder?: Responder
+  writer?: WriteResponder
   auth?: InitialAuth
 }
 
@@ -42,6 +44,7 @@ async function renderPage({
   calendars = [calendarEntry('a', { selected: true })],
   events = (calendarId) => ({ items: [eventItem(`from-${calendarId}`)] }),
   responder,
+  writer,
   auth = TEST_USER,
 }: Options = {}) {
   const fake = setupFakeGoogleClient(
@@ -50,6 +53,7 @@ async function renderPage({
         path === '/users/me/calendarList'
           ? { items: calendars }
           : events(calendarIdOf(path), params)),
+    writer,
   )
   const i18n = await createI18n('sv')
   const authService = createFakeAuthService(auth)
@@ -57,7 +61,9 @@ async function renderPage({
     <I18nextProvider i18n={i18n}>
       <AuthProvider service={authService.service}>
         <fake.Wrapper>
-          <CalendarPage />
+          <UndoProvider>
+            <CalendarPage />
+          </UndoProvider>
         </fake.Wrapper>
       </AuthProvider>
     </I18nextProvider>,
@@ -171,8 +177,9 @@ describe('CalendarPage', () => {
     await screen.findByText('Händelse from-a')
 
     const toolbar = screen.getByRole('toolbar', { name: 'Kalendernavigering' })
-    // Idag, föregående, nästa och de fem vyerna.
-    expect(within(toolbar).getAllByRole('button')).toHaveLength(8)
+    // Ny händelse, idag, föregående, nästa och de fem vyerna.
+    expect(within(toolbar).getAllByRole('button')).toHaveLength(9)
+    expect(within(toolbar).getByRole('button', { name: 'Ny händelse' })).toBeEnabled()
   })
 
   describe('vyer', () => {
@@ -523,6 +530,177 @@ describe('CalendarPage', () => {
         expect(screen.queryByTestId('calendar-stale')).not.toBeInTheDocument()
       })
       expect(screen.getByText('Händelse from-a')).toBeInTheDocument()
+    })
+  })
+
+  describe('skapa händelse', () => {
+    const TWO_WRITABLE = [
+      calendarEntry('a', { selected: true, primary: true }),
+      calendarEntry('b', { selected: false }),
+    ]
+
+    /** En liten låtsasserver: det som skapas finns kvar vid nästa hämtning, som hos Google. */
+    function fakeServer() {
+      const created: Record<string, unknown>[] = []
+      const writer: WriteResponder = (method, path, request) => {
+        if (method === 'POST') {
+          const item = { ...(request.body as Record<string, unknown>), etag: '"srv"' }
+          created.push(item)
+          return item
+        }
+        const id = decodeURIComponent(path.split('/')[4] ?? '')
+        const index = created.findIndex((item) => item.id === id)
+        if (index >= 0) created.splice(index, 1)
+        return undefined
+      }
+      const events = (calendarId: string) => ({
+        items: [eventItem(`from-${calendarId}`), ...created.filter(() => calendarId === 'a')],
+      })
+      return { created, writer, events }
+    }
+
+    async function openNewEvent(options: Options = {}) {
+      const page = await renderPage(options)
+      await screen.findByText('Händelse from-a')
+      await page.user.click(screen.getByRole('button', { name: 'Ny händelse' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Ny händelse' })
+      return { ...page, dialog }
+    }
+
+    it('öppnar en popover med titelfältet i fokus och visar ett utkast i rutnätet', async () => {
+      const { dialog } = await openNewEvent({ writer: fakeServer().writer })
+
+      expect(within(dialog).getByRole('textbox', { name: 'Titel' })).toHaveFocus()
+      expect(document.querySelector('.sc-draft')).not.toBeNull()
+    })
+
+    it('sparar med Spara: händelsen syns direkt och skickas till Google med en timmes längd', async () => {
+      const server = fakeServer()
+      const { dialog, user, requestJson, getJson } = await openNewEvent({
+        writer: server.writer,
+        events: server.events,
+      })
+      const callsBefore = eventCalls(getJson).length
+
+      await user.type(within(dialog).getByRole('textbox', { name: 'Titel' }), 'Gympass')
+      await user.click(within(dialog).getByRole('button', { name: 'Spara' }))
+
+      expect(await screen.findByText('Gympass')).toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(document.querySelector('.sc-draft')).toBeNull()
+      await waitFor(() => {
+        expect(requestJson).toHaveBeenCalledTimes(1)
+      })
+      const [method, path, request] = requestJson.mock.calls[0] ?? []
+      expect(method).toBe('POST')
+      expect(path).toBe('/calendars/a/events')
+      const body = request?.body as {
+        summary: string
+        start: { dateTime: string }
+        end: { dateTime: string }
+      }
+      expect(body.summary).toBe('Gympass')
+      expect(Date.parse(body.end.dateTime) - Date.parse(body.start.dateTime)).toBe(60 * 60 * 1000)
+      // Händelsen finns kvar efter att kalendern hämtats om från Google.
+      await waitFor(() => {
+        expect(eventCalls(getJson).length).toBeGreaterThan(callsBefore)
+      })
+      expect(screen.getByText('Gympass')).toBeInTheDocument()
+    })
+
+    it('avbryter med Esc utan att skicka något, och tar bort utkastet', async () => {
+      const { user, requestJson } = await openNewEvent({ writer: fakeServer().writer })
+
+      await user.keyboard('{Escape}')
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      })
+      expect(document.querySelector('.sc-draft')).toBeNull()
+      expect(requestJson).not.toHaveBeenCalled()
+    })
+
+    it('rullar tillbaka och visar ett felmeddelande när Google svarar med fel', async () => {
+      const { dialog, user } = await openNewEvent({
+        writer: () => {
+          throw new GoogleApiError('forbidden', 403)
+        },
+      })
+
+      await user.type(within(dialog).getByRole('textbox', { name: 'Titel' }), 'Gympass{Enter}')
+
+      expect(await screen.findByText(/Kunde inte spara: Ny händelse: Gympass/)).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.queryByText('Gympass')).not.toBeInTheDocument()
+      })
+    })
+
+    it('går att ångra från toasten', async () => {
+      const server = fakeServer()
+      const { dialog, user, requestJson } = await openNewEvent({
+        writer: server.writer,
+        events: server.events,
+      })
+      await user.type(within(dialog).getByRole('textbox', { name: 'Titel' }), 'Gympass{Enter}')
+      await screen.findByText('Gympass')
+
+      await user.click(await screen.findByRole('button', { name: 'Ångra' }))
+
+      await waitFor(() => {
+        expect(screen.queryByText('Gympass')).not.toBeInTheDocument()
+      })
+      await waitFor(() => {
+        expect(requestJson).toHaveBeenCalledWith(
+          'DELETE',
+          expect.stringMatching(/^\/calendars\/a\/events\//),
+          expect.anything(),
+        )
+      })
+    })
+
+    it('tänder kalendern när händelsen skapas i en kalender som är släckt', async () => {
+      const server = fakeServer()
+      const { dialog, user } = await openNewEvent({
+        calendars: TWO_WRITABLE,
+        writer: server.writer,
+        events: server.events,
+      })
+      expect(screen.getByRole('checkbox', { name: 'b' })).not.toBeChecked()
+
+      await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Kalender' }), 'b')
+      await user.click(within(dialog).getByRole('button', { name: 'Spara' }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox', { name: 'b' })).toBeChecked()
+      })
+    })
+
+    it('föreslår huvudkalendern och bara kalendrar man får skriva i', async () => {
+      const { dialog } = await openNewEvent({
+        calendars: [
+          calendarEntry('holidays', { selected: true, accessRole: 'reader' }),
+          calendarEntry('a', { selected: true, primary: true }),
+          calendarEntry('b', { selected: true, accessRole: 'writer' }),
+        ],
+        writer: fakeServer().writer,
+      })
+
+      const select = within(dialog).getByRole('combobox', { name: 'Kalender' })
+      expect(select).toHaveValue('a')
+      expect(
+        within(select)
+          .getAllByRole('option')
+          .map((o) => o.textContent),
+      ).toEqual(['a', 'b'])
+    })
+
+    it('visar ingen knapp för att skapa när man inte får skriva i någon kalender', async () => {
+      await renderPage({
+        calendars: [calendarEntry('a', { selected: true, accessRole: 'reader' })],
+      })
+      await screen.findByText('Händelse from-a')
+
+      expect(screen.queryByRole('button', { name: 'Ny händelse' })).not.toBeInTheDocument()
     })
   })
 })

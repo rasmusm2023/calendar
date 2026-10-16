@@ -120,5 +120,27 @@
       "unavailable": "Could not reach Google or the server right now. Try again in a moment.",
       "unknown": "Something went wrong. Please try again."
     }
+  },
+  "event": {
+    "untitled": "(No title)",
+    "create": {
+      "toolbar": "New event",
+      "label": "New event: {{title}}",
+      "draftTitle": "New event",
+      "quick": {
+        "dialog": "New event",
+        "title": "Title",
+        "titlePlaceholder": "Add title",
+        "allDay": "All day",
+        "startDate": "Start date",
+        "startTime": "Start time",
+        "endDate": "End date",
+        "endTime": "End time",
+        "calendar": "Calendar",
+        "invalidTime": "Check the dates and times: the end must be after the start.",
+        "save": "Save",
+        "cancel": "Cancel"
+      }
+    }
   }
 }

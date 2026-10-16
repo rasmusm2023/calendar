@@ -7,7 +7,7 @@ const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CORS_HEADERS = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': '*',
-  'access-control-allow-methods': 'GET, OPTIONS',
+  'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
 }
 
 export interface FakeCalendar {
@@ -78,6 +78,39 @@ export interface CalendarApiMock {
   unauthorized: boolean
   /** Alla anrop som gjorts mot händelser. */
   eventRequests: { calendarId: string; timeMin: string; timeMax: string }[]
+  /** Skrivande anrop (POST, PATCH, DELETE) mot händelser, i den ordning de kom. */
+  writeRequests: { method: string; path: string; body: unknown }[]
+  /** Om satt svarar alla skrivande anrop med det här felet. */
+  failWrites: { status: number; reason: string } | null
+}
+
+interface InsertBody {
+  id: string
+  summary?: string
+  start: { date?: string; dateTime?: string }
+  end: { date?: string; dateTime?: string }
+}
+
+/** Händelsen som Google skickar den (event resource). */
+function toResource(event: FakeEvent) {
+  return {
+    id: event.id,
+    etag: `"${event.id}"`,
+    summary: event.title,
+    start: event.allDay ? { date: event.start } : { dateTime: event.start },
+    end: event.allDay ? { date: event.end } : { dateTime: event.end },
+  }
+}
+
+function fromInsertBody(body: InsertBody): FakeEvent {
+  const allDay = body.start.date !== undefined
+  return {
+    id: body.id,
+    title: body.summary ?? '',
+    start: body.start.date ?? body.start.dateTime ?? '',
+    end: body.end.date ?? body.end.dateTime ?? '',
+    allDay,
+  }
 }
 
 function jsonError(route: Route, status: number, reason: string) {
@@ -96,9 +129,13 @@ export async function mockCalendarApi(
 ): Promise<CalendarApiMock> {
   const state: CalendarApiMock = {
     ...initial,
+    // Egen kopia: testet och mocken ändrar händelserna, och andra tester delar samma startdata.
+    events: structuredClone(initial.events),
     forbidden: new Set(),
     unauthorized: false,
     eventRequests: [],
+    writeRequests: [],
+    failWrites: null,
   }
 
   await page.route(`${CALENDAR_API}/**`, async (route) => {
@@ -133,9 +170,12 @@ export async function mockCalendarApi(
       return
     }
 
-    const match = /^\/calendars\/([^/]+)\/events$/.exec(path)
-    if (match?.[1]) {
-      const calendarId = decodeURIComponent(match[1])
+    const eventsMatch = /^\/calendars\/([^/]+)\/events$/.exec(path)
+    const eventMatch = /^\/calendars\/([^/]+)\/events\/([^/]+)$/.exec(path)
+    const method = request.method()
+
+    if (eventsMatch?.[1] && method === 'GET') {
+      const calendarId = decodeURIComponent(eventsMatch[1])
       const timeMin = url.searchParams.get('timeMin') ?? ''
       const timeMax = url.searchParams.get('timeMax') ?? ''
       state.eventRequests.push({ calendarId, timeMin, timeMax })
@@ -147,13 +187,7 @@ export async function mockCalendarApi(
       const to = Date.parse(timeMax)
       const items = (state.events[calendarId] ?? [])
         .filter((event) => Date.parse(event.start) < to && Date.parse(event.end) > from)
-        .map((event) => ({
-          id: event.id,
-          etag: `"${event.id}"`,
-          summary: event.title,
-          start: event.allDay ? { date: event.start } : { dateTime: event.start },
-          end: event.allDay ? { date: event.end } : { dateTime: event.end },
-        }))
+        .map(toResource)
       await route.fulfill({
         headers: CORS_HEADERS,
         contentType: 'application/json',
@@ -162,6 +196,43 @@ export async function mockCalendarApi(
       return
     }
 
+    if (eventsMatch?.[1] && method === 'POST') {
+      const calendarId = decodeURIComponent(eventsMatch[1])
+      const body = request.postDataJSON() as InsertBody
+      state.writeRequests.push({ method, path, body })
+      if (state.failWrites) {
+        await jsonError(route, state.failWrites.status, state.failWrites.reason)
+        return
+      }
+      const event = fromInsertBody(body)
+      const list = (state.events[calendarId] ??= [])
+      if (list.some((existing) => existing.id === event.id)) {
+        await jsonError(route, 409, 'duplicate')
+        return
+      }
+      list.push(event)
+      await route.fulfill({
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify(toResource(event)),
+      })
+      return
+    }
+
+    if (eventMatch?.[1] && eventMatch[2] && method === 'DELETE') {
+      const calendarId = decodeURIComponent(eventMatch[1])
+      const eventId = decodeURIComponent(eventMatch[2])
+      state.writeRequests.push({ method, path, body: undefined })
+      if (state.failWrites) {
+        await jsonError(route, state.failWrites.status, state.failWrites.reason)
+        return
+      }
+      state.events[calendarId] = (state.events[calendarId] ?? []).filter(
+        (event) => event.id !== eventId,
+      )
+      await route.fulfill({ status: 204, headers: CORS_HEADERS })
+      return
+    }
     await jsonError(route, 404, 'notFound')
   })
 

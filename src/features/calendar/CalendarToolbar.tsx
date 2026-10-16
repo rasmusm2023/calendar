@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +22,8 @@ interface CalendarToolbarProps {
   onPrevious: () => void
   onNext: () => void
   onToday: () => void
+  /** Skapa en händelse utan att peka i rutnätet. Knappen visas inte utan den. */
+  onCreate?: () => void
 }
 
 const DAY_OPTIONS = Array.from({ length: MAX_DAYS - MIN_DAYS + 1 }, (_, i) => MIN_DAYS + i)
@@ -36,6 +38,7 @@ export function CalendarToolbar({
   onPrevious,
   onNext,
   onToday,
+  onCreate,
 }: CalendarToolbarProps) {
   const { t } = useTranslation()
 
@@ -45,6 +48,12 @@ export function CalendarToolbar({
       aria-label={t('calendar.toolbar.label')}
       className="flex flex-wrap items-center gap-2 border-b px-4 py-2"
     >
+      {onCreate && (
+        <Button size="sm" onClick={onCreate}>
+          <Plus aria-hidden="true" />
+          {t('event.create.toolbar')}
+        </Button>
+      )}
       <Button variant="outline" size="sm" onClick={onToday}>
         {t('calendar.toolbar.today')}
       </Button>

@@ -13,3 +13,12 @@ export {
   weekRange,
   type DateRange,
 } from './range'
+export {
+  addDaysToDateString,
+  dateStringInZone,
+  daysBetweenDateStrings,
+  isDateString,
+  isTimeString,
+  timeStringInZone,
+  wallTimeToRfc3339,
+} from './wallClock'

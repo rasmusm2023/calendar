@@ -4,6 +4,7 @@ import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '@/features/auth'
 import { GoogleAccessProvider } from '@/features/google-access'
+import { UndoProvider } from '@/features/undo'
 import { createI18n } from '@/i18n'
 import { createFakeAuthService, TEST_USER, type InitialAuth } from '@/test/fakeAuthService'
 import { TEST_CALENDAR_COLOR } from '@/test/fixtures'
@@ -21,7 +22,9 @@ async function renderApp(initial: InitialAuth) {
       <AuthProvider service={fake.service}>
         <GoogleAccessProvider service={google.service}>
           <QueryProvider>
-            <App />
+            <UndoProvider>
+              <App />
+            </UndoProvider>
           </QueryProvider>
         </GoogleAccessProvider>
       </AuthProvider>

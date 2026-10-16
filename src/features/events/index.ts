@@ -14,3 +14,12 @@ export {
   type EventsForCalendars,
   type UseEventsParams,
 } from './useEventsForCalendars'
+export type { CreateEventInput } from './createEventCommand'
+export {
+  QuickCreatePopover,
+  type PopoverAnchorTarget,
+  type QuickCreateChange,
+  type QuickCreatePopoverProps,
+} from './QuickCreatePopover'
+export { useCreateEvent } from './useCreateEvent'
+export { isWritableCalendar, pickDefaultCalendarId } from './writableCalendars'

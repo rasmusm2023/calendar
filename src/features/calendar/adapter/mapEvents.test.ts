@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { FALLBACK_EVENT_COLOR } from '@/features/events'
 import type { CalEvent } from '@/types'
-import { toFullCalendarEvents, toFullCalendarId } from './mapEvents'
+import {
+  DRAFT_CLASS,
+  DRAFT_EVENT_ID,
+  toFullCalendarDraft,
+  toFullCalendarEvents,
+  toFullCalendarId,
+} from './mapEvents'
 
 const TIMED: CalEvent = {
   id: 'e1',
@@ -73,5 +79,62 @@ describe('toFullCalendarEvents', () => {
 
   it('ger en tom lista för inga händelser', () => {
     expect(toFullCalendarEvents([], { calendarColors: COLORS })).toEqual([])
+  })
+})
+
+describe('titel utan text', () => {
+  it('visar den angivna texten för en händelse utan titel, men rör inte riktiga titlar', () => {
+    const [untitled, titled] = toFullCalendarEvents(
+      [{ ...TIMED, title: '' }, TIMED],
+      { calendarColors: COLORS },
+      '(Ingen titel)',
+    )
+
+    expect(untitled?.title).toBe('(Ingen titel)')
+    expect(titled?.title).toBe(TIMED.title)
+  })
+})
+
+describe('toFullCalendarDraft', () => {
+  const draft = {
+    time: { start: '2026-10-19T09:00:00+02:00', end: '2026-10-19T10:00:00+02:00', allDay: false },
+    calendarId: 'work',
+    title: 'Ny händelse',
+  }
+
+  it('ritar utkastet i vald kalenders färg med egen klass och id', () => {
+    const input = toFullCalendarDraft(draft, { calendarColors: COLORS })
+
+    expect(input).toMatchObject({
+      id: DRAFT_EVENT_ID,
+      title: 'Ny händelse',
+      start: draft.time.start,
+      end: draft.time.end,
+      allDay: false,
+      backgroundColor: '#000000',
+      classNames: [DRAFT_CLASS],
+      editable: false,
+      extendedProps: { isDraft: true },
+    })
+  })
+
+  it('har ett id som inte kan förväxlas med en riktig händelse', () => {
+    const real = toFullCalendarEvents([TIMED], { calendarColors: COLORS })[0]
+    expect(real?.id).toBe('work/e1')
+    expect(DRAFT_EVENT_ID).not.toContain('/')
+  })
+
+  it('klarar heldag och en kalender som saknar färg', () => {
+    const input = toFullCalendarDraft(
+      {
+        ...draft,
+        calendarId: 'okänd',
+        time: { start: '2026-10-19', end: '2026-10-20', allDay: true },
+      },
+      { calendarColors: COLORS },
+    )
+
+    expect(input).toMatchObject({ allDay: true, start: '2026-10-19', end: '2026-10-20' })
+    expect(input.backgroundColor).toBe(FALLBACK_EVENT_COLOR)
   })
 })

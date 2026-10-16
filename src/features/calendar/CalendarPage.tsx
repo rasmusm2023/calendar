@@ -1,23 +1,42 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  QuickCreatePopover,
+  isWritableCalendar,
+  pickDefaultCalendarId,
   useCalendars,
+  useCreateEvent,
   useEventsForCalendars,
   usePrefetchEvents,
+  type CreateEventInput,
+  type QuickCreateChange,
   type StyleContext,
 } from '@/features/events'
 import { getBrowserTimeZone } from '@/lib/dates'
-import { GoogleAccessError, GoogleApiError } from '@/lib/google'
+import { GoogleAccessError, GoogleApiError, type EventTime } from '@/lib/google'
 import { CalendarGrid } from './adapter/CalendarGrid'
 import { shiftAnchor, visibleRange } from './calendarView'
 import { CalendarPicker } from './CalendarPicker'
 import { CalendarToolbar } from './CalendarToolbar'
+import { defaultNewEventTime } from './newEventTime'
 import { useCalendarSelection } from './useCalendarSelection'
 import { useCalendarView } from './useCalendarView'
+import { useDraftAnchor } from './useDraftAnchor'
 import { formatViewTitle, viewWeekNumber } from './viewTitle'
+
+/** Händelsen som håller på att skapas i snabbpopovern. */
+interface Draft {
+  /** Nytt värde för varje utkast. Gör att popovern (och dess formulär) börjar om. */
+  session: number
+  /** Tiden utkastet började med. */
+  initial: EventTime
+  /** Tiden som formuläret beskriver just nu. */
+  time: EventTime
+  calendarId: string
+}
 
 type LoadErrorKey = 'network' | 'unavailable' | 'rateLimited' | 'generic'
 
@@ -52,9 +71,10 @@ export function CalendarPage() {
   const visibleCalendars = selection.visible
   const styleContext = useMemo<StyleContext>(
     () => ({
-      calendarColors: new Map(visibleCalendars.map((c) => [c.id, c.backgroundColor])),
+      // Alla kalendrar, inte bara de synliga: utkastet ritas i vald kalenders färg även om den är släckt.
+      calendarColors: new Map(allCalendars.map((c) => [c.id, c.backgroundColor])),
     }),
-    [visibleCalendars],
+    [allCalendars],
   )
 
   // Har vi en kalenderlista, även om den senaste uppdateringen misslyckades, visas den och dess händelser.
@@ -81,6 +101,68 @@ export function CalendarPage() {
     enabled: hasCalendars && !eventsResult.isFetching,
   })
 
+  // Skapa händelse: ett klick eller en dragning i rutnätet (eller knappen) ger ett utkast och öppnar popovern.
+  const createEvent = useCreateEvent(timeZone)
+  const gridArea = useRef<HTMLDivElement>(null)
+  const draftAnchor = useDraftAnchor(gridArea)
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const nextSession = useRef(0)
+  const writableCalendars = useMemo(() => allCalendars.filter(isWritableCalendar), [allCalendars])
+  const defaultCalendarId = useMemo(
+    () => pickDefaultCalendarId(allCalendars, new Set(visibleCalendars.map((c) => c.id))),
+    [allCalendars, visibleCalendars],
+  )
+
+  const startDraft = useCallback(
+    (time: EventTime) => {
+      if (defaultCalendarId === undefined) return
+      nextSession.current += 1
+      draftAnchor.reset()
+      setDraft({
+        session: nextSession.current,
+        initial: time,
+        time,
+        calendarId: defaultCalendarId,
+      })
+    },
+    [defaultCalendarId, draftAnchor],
+  )
+
+  const handleDraftChange = useCallback((change: QuickCreateChange) => {
+    setDraft((current) => {
+      if (current === null) return current
+      const time = change.time ?? current.time
+      if (
+        current.calendarId === change.calendarId &&
+        current.time.start === time.start &&
+        current.time.end === time.end &&
+        current.time.allDay === time.allDay
+      ) {
+        return current
+      }
+      return { ...current, time, calendarId: change.calendarId }
+    })
+  }, [])
+
+  const cancelDraft = useCallback(() => {
+    setDraft(null)
+  }, [])
+
+  const submitDraft = (input: CreateEventInput) => {
+    // En händelse i en dold kalender syns inte efteråt. Som i Google Calendar tänds kalendern då.
+    if (!selection.isVisible(input.calendarId)) selection.toggle(input.calendarId)
+    createEvent(input)
+    setDraft(null)
+  }
+
+  const gridDraft = useMemo(
+    () =>
+      draft === null
+        ? null
+        : { time: draft.time, calendarId: draft.calendarId, title: t('event.create.draftTitle') },
+    [draft, t],
+  )
+
   const goTo = (direction: -1 | 1) => {
     setAnchor(shiftAnchor(view, anchor, direction, timeZone))
   }
@@ -104,6 +186,11 @@ export function CalendarPage() {
       onToday={() => {
         setAnchor(new Date())
       }}
+      {...(defaultCalendarId !== undefined && {
+        onCreate: () => {
+          startDraft(defaultNewEventTime(range, anchor, new Date(), timeZone))
+        },
+      })}
     />
   )
 
@@ -219,7 +306,7 @@ export function CalendarPage() {
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex flex-col gap-2 px-4 pt-2 empty:hidden">{notices}</div>
-          <div className="min-h-0 flex-1 p-2">
+          <div ref={gridArea} className="min-h-0 flex-1 p-2">
             <CalendarGrid
               events={eventsResult.events}
               styleContext={styleContext}
@@ -227,10 +314,27 @@ export function CalendarPage() {
               date={anchor}
               locale={locale}
               ariaLabel={t('calendar.label')}
+              untitledLabel={t('event.untitled')}
+              draft={gridDraft}
+              onDraftElement={draftAnchor.setElement}
+              {...(defaultCalendarId !== undefined && { onSelectTime: startDraft })}
             />
           </div>
         </div>
       </div>
+      {draft !== null && defaultCalendarId !== undefined && (
+        <QuickCreatePopover
+          key={draft.session}
+          initial={draft.initial}
+          calendars={writableCalendars}
+          initialCalendarId={draft.calendarId}
+          timeZone={timeZone}
+          anchor={draftAnchor.anchor}
+          onChange={handleDraftChange}
+          onSubmit={submitDraft}
+          onCancel={cancelDraft}
+        />
+      )}
     </div>
   )
 }

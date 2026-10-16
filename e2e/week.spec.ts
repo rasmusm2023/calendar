@@ -1,9 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
-import { clearAuthAccounts, signIn } from './support/auth.ts'
+import { openCalendar, eventBlock } from './support/app.ts'
+import { clearAuthAccounts } from './support/auth.ts'
 import {
   fakeGoogle,
-  mockCalendarApi,
-  stubGoogleIdentityServices,
   zonedTime,
   type CalendarApiMock,
   type FakeCalendar,
@@ -40,21 +39,12 @@ test.beforeEach(async ({ request }) => {
   await fakeGoogle.reset(request)
 })
 
-/** Loggar in, kopplar Google Calendar (riktiga Cloud Functions i emulatorn) och väntar på veckovyn. */
-async function openWeek(page: Page, setup?: (api: CalendarApiMock) => void) {
-  await stubGoogleIdentityServices(page)
-  const api = await mockCalendarApi(page, { calendars: CALENDARS, events: EVENTS })
-  setup?.(api)
-
-  await signIn(page)
-  await page.getByRole('button', { name: 'Koppla Google Calendar' }).click()
-  await expect(page.getByTestId('app-root')).toBeVisible()
-  return api
+/** Loggar in, kopplar Google Calendar och väntar på veckovyn. */
+function openWeek(page: Page, setup?: (api: CalendarApiMock) => void) {
+  return openCalendar(page, { calendars: CALENDARS, events: EVENTS }, setup)
 }
 
-function event(page: Page, title: string) {
-  return page.locator('.fc-event', { hasText: title })
-}
+const event = eventBlock
 
 test('koppla Google Calendar och se veckan med kalenderfärger och kalendervalg', async ({
   page,

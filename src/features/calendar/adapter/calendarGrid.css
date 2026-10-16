@@ -31,3 +31,18 @@
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
+
+/*
+ * Utkastet: markerar var en ny händelse hamnar medan snabbpopovern är öppen. Det går inte att klicka på,
+ * så ett klick bredvid eller på det startar i stället ett nytt utkast.
+ */
+.sc-calendar-grid .sc-draft {
+  pointer-events: none;
+  opacity: 0.85;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+/* Markeringen medan man drar i rutnätet: samma färg som utkastet, så att dragningen går över i utkastet utan hopp. */
+.sc-calendar-grid .fc-highlight {
+  background: color-mix(in oklch, var(--primary) 18%, transparent);
+}

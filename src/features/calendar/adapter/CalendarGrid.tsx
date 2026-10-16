@@ -1,12 +1,16 @@
-import type { CalendarOptions, DatesSetArg } from '@fullcalendar/core'
+import type { CalendarOptions, DateSelectArg, DatesSetArg, EventMountArg } from '@fullcalendar/core'
 import svLocale from '@fullcalendar/core/locales/sv'
 import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin, {
+  type DateClickArg as FullCalendarDateClickArg,
+} from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { StyleContext } from '@/features/events'
 import { getBrowserTimeZone } from '@/lib/dates'
+import type { EventTime } from '@/lib/google'
 import type { CalEvent } from '@/types'
 import {
   AGENDA_DAYS,
@@ -16,11 +20,17 @@ import {
   visibleRange,
   type CalendarView,
 } from '../calendarView'
-import { toFullCalendarEvents } from './mapEvents'
+import {
+  DRAFT_EVENT_ID,
+  toFullCalendarDraft,
+  toFullCalendarEvents,
+  type GridDraft,
+} from './mapEvents'
 import { scrollTimeForNow } from './scrollTime'
+import { eventTimeFromClick, eventTimeFromSelection } from './selection'
 import './calendarGrid.css'
 
-const PLUGINS = [timeGridPlugin, dayGridPlugin, listPlugin]
+const PLUGINS = [timeGridPlugin, dayGridPlugin, listPlugin, interactionPlugin]
 const LOCALES = [svLocale]
 const CLOCK_FORMAT = { hour: '2-digit', minute: '2-digit', hour12: false } as const
 const DAY_HEADER_FORMAT = { weekday: 'short', day: 'numeric', month: 'numeric' } as const
@@ -29,6 +39,11 @@ const MONDAY = 1
 const DEFAULT_SCROLL_TIME = '07:00:00'
 
 const MONTH_VIEW = 'dayGridMonth'
+
+/** Snäppning av markeringar i tidsrutnätet (PRD 6.4: 15 min). */
+const SNAP_DURATION = '00:15:00'
+/** Hur långt musen måste dras innan det räknas som en dragning och inte som ett klick. */
+const SELECT_MIN_DISTANCE_PX = 4
 
 /** Namnet på vyn hos FullCalendar. Det är bara adaptern som känner till dem. */
 function fcViewName(view: CalendarView): string {
@@ -97,6 +112,17 @@ export interface CalendarGridProps {
   ariaLabel: string
   /** Månadsvyn visar tidsbestämda händelser som fyllda block (standard) i stället för prickar. */
   monthFilledBlocks?: boolean
+  /**
+   * Användaren klickade eller drog i rutnätet för att skapa en händelse. Får tiden som en ny händelse skulle ha.
+   * Utan den går det inte att markera något i rutnätet.
+   */
+  onSelectTime?: (time: EventTime) => void
+  /** Utkastet för händelsen som håller på att skapas. Ritas som en vanlig händelse tills det tas bort. */
+  draft?: GridDraft | null
+  /** Anropas med utkastets element när det ritats, så att t.ex. en popover kan peka på det. */
+  onDraftElement?: (element: HTMLElement) => void
+  /** Text för händelser utan titel. */
+  untitledLabel?: string
 }
 
 /**
@@ -115,12 +141,16 @@ export function CalendarGrid({
   locale,
   ariaLabel,
   monthFilledBlocks = true,
+  onSelectTime,
+  draft = null,
+  onDraftElement,
+  untitledLabel = '',
 }: CalendarGridProps) {
   const calendarRef = useRef<FullCalendar>(null)
-  const calendarEvents = useMemo(
-    () => toFullCalendarEvents(events, styleContext),
-    [events, styleContext],
-  )
+  const calendarEvents = useMemo(() => {
+    const inputs = toFullCalendarEvents(events, styleContext, untitledLabel)
+    return draft ? [...inputs, toFullCalendarDraft(draft, styleContext)] : inputs
+  }, [events, styleContext, untitledLabel, draft])
   const views = useMemo(() => buildViews(), [])
 
   // Vy och datum styr kalendern. Används tiden som beroende så att en ny Date med samma värde inte flyttar vyn.
@@ -142,6 +172,28 @@ export function CalendarGrid({
     }
   }, [])
 
+  // Markering och klick i rutnätet blir en tid för en ny händelse. Den inbyggda markeringen tas bort direkt:
+  // utkastet (draft) tar över och visar var händelsen hamnar.
+  const handleSelect = useCallback(
+    (arg: DateSelectArg) => {
+      arg.view.calendar.unselect()
+      onSelectTime?.(eventTimeFromSelection(arg, getBrowserTimeZone()))
+    },
+    [onSelectTime],
+  )
+  const handleDateClick = useCallback(
+    (arg: FullCalendarDateClickArg) => {
+      onSelectTime?.(eventTimeFromClick(arg, getBrowserTimeZone()))
+    },
+    [onSelectTime],
+  )
+  const handleEventDidMount = useCallback(
+    (arg: EventMountArg) => {
+      if (arg.event.id === DRAFT_EVENT_ID) onDraftElement?.(arg.el)
+    },
+    [onDraftElement],
+  )
+
   return (
     <div className="sc-calendar-grid" role="region" aria-label={ariaLabel}>
       <FullCalendar
@@ -161,7 +213,12 @@ export function CalendarGrid({
         // Ställs in här och inte per vy, eftersom FullCalendar läser den från kalenderns egna inställningar.
         eventDisplay={monthFilledBlocks ? 'block' : 'auto'}
         editable={false}
-        selectable={false}
+        selectable={onSelectTime !== undefined}
+        selectMinDistance={SELECT_MIN_DISTANCE_PX}
+        snapDuration={SNAP_DURATION}
+        select={handleSelect}
+        dateClick={handleDateClick}
+        eventDidMount={handleEventDidMount}
         eventInteractive
         nowIndicator
         allDaySlot

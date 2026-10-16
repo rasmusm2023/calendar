@@ -120,5 +120,27 @@
       "unavailable": "Det gick inte att nå Google eller servern just nu. Försök igen om en stund.",
       "unknown": "Något gick fel. Försök igen."
     }
+  },
+  "event": {
+    "untitled": "(Ingen titel)",
+    "create": {
+      "toolbar": "Ny händelse",
+      "label": "Ny händelse: {{title}}",
+      "draftTitle": "Ny händelse",
+      "quick": {
+        "dialog": "Ny händelse",
+        "title": "Titel",
+        "titlePlaceholder": "Lägg till titel",
+        "allDay": "Heldag",
+        "startDate": "Startdatum",
+        "startTime": "Starttid",
+        "endDate": "Slutdatum",
+        "endTime": "Sluttid",
+        "calendar": "Kalender",
+        "invalidTime": "Kontrollera datum och tider: slutet måste ligga efter början.",
+        "save": "Spara",
+        "cancel": "Avbryt"
+      }
+    }
   }
 }
