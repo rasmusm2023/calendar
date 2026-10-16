@@ -32,3 +32,5 @@ export {
   type EventEditPanelProps,
   type EventReadOnlyReason,
 } from './EventEditPanel'
+export { useDeleteEvent } from './useDeleteEvent'
+export { useDuplicateEvent } from './useDuplicateEvent'

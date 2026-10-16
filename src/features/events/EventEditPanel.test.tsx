@@ -209,6 +209,41 @@ describe('EventEditPanel', () => {
     expect(onSave).not.toHaveBeenCalled()
   })
 
+  it('tar bort och duplicerar med egna knappar, och stänger panelen', async () => {
+    const onDelete = vi.fn()
+    const onDuplicate = vi.fn()
+    const { onSave, onClose, user } = await renderPanel({ onDelete, onDuplicate })
+    await user.type(await screen.findByRole('textbox', { name: 'Titel' }), 'x')
+
+    await user.click(screen.getByRole('button', { name: 'Duplicera' }))
+    await user.click(screen.getByRole('button', { name: 'Ta bort' }))
+
+    expect(onDuplicate).toHaveBeenCalledOnce()
+    expect(onDelete).toHaveBeenCalledOnce()
+    expect(onClose).toHaveBeenCalledTimes(2)
+    // Det som skrivits men inte sparats följer inte med.
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('visar inga knappar för att ta bort eller duplicera utan handlers', async () => {
+    await renderPanel()
+
+    await screen.findByRole('dialog')
+    expect(screen.queryByRole('button', { name: 'Duplicera' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ta bort' })).not.toBeInTheDocument()
+  })
+
+  it('går att duplicera men inte ta bort en instans av en återkommande händelse', async () => {
+    await renderPanel({
+      readOnlyReason: 'recurring',
+      onDelete: vi.fn(),
+      onDuplicate: vi.fn(),
+    })
+
+    expect(await screen.findByRole('button', { name: 'Duplicera' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Ta bort' })).not.toBeInTheDocument()
+  })
+
   it('är låst och utan spara-knapp när kalendern är skrivskyddad', async () => {
     await renderPanel({ readOnlyReason: 'calendar' })
 

@@ -39,6 +39,8 @@ export interface NewEvent extends EventTime {
   id: string
   title: string
   location?: string
+  description?: string
+  reminders?: EventReminders
   familyId?: string
   important?: boolean
 }
@@ -146,6 +148,8 @@ export async function insertEvent(
     id: event.id,
     summary: event.title,
     ...(event.location !== undefined && { location: event.location }),
+    ...(event.description !== undefined && { description: event.description }),
+    ...(event.reminders !== undefined && { reminders: event.reminders }),
     ...timeFields(event, 'insert'),
     ...(Object.keys(privateProps).length > 0 && { extendedProperties: { private: privateProps } }),
   }

@@ -17,7 +17,7 @@ import interactionPlugin, {
 import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 import type { StyleContext, UpdateEventTimeRequest } from '@/features/events'
 import { getBrowserTimeZone } from '@/lib/dates'
@@ -53,6 +53,8 @@ const DEFAULT_SCROLL_TIME = '07:00:00'
 const MONTH_VIEW = 'dayGridMonth'
 
 /** Det vi lagt i extendedProps för varje händelse (se 	oFullCalendarEvents). */
+const CALENDAR_ID_ATTRIBUTE = 'scCalendarId'
+const EVENT_ID_ATTRIBUTE = 'scEventId'
 const eventPropsSchema = z.object({ calendarId: z.string(), eventId: z.string() })
 
 /** Snäppning av markeringar i tidsrutnätet (PRD 6.4: 15 min). */
@@ -146,7 +148,18 @@ export interface CalendarGridProps {
    */
   onEventTimeChange?: (request: UpdateEventTimeRequest) => void
   /** Användaren klickade på (eller valde med tangentbordet) en händelse. Utkastet räknas inte. */
-  onEventClick?: (ref: { calendarId: string; eventId: string }) => void
+  onEventClick?: (ref: EventRef) => void
+  /** Delete eller Backspace på en händelse som har tangentbordsfokus. Den som tar emot avgör om den får tas bort. */
+  onEventDelete?: (ref: EventRef) => void
+  /** Ctrl/Cmd+D på en händelse som har tangentbordsfokus. */
+  onEventDuplicate?: (ref: EventRef) => void
+  /** Användaren släppte en händelse på ny plats med Alt nedtryckt: gör en kopia där i stället för att flytta. */
+  onEventCopy?: (ref: EventRef, to: EventTime) => void
+}
+
+export interface EventRef {
+  calendarId: string
+  eventId: string
 }
 
 /**
@@ -172,6 +185,9 @@ export function CalendarGrid({
   editableCalendarIds,
   onEventTimeChange,
   onEventClick,
+  onEventDelete,
+  onEventDuplicate,
+  onEventCopy,
 }: CalendarGridProps) {
   const calendarRef = useRef<FullCalendar>(null)
   const calendarEvents = useMemo(() => {
@@ -216,9 +232,49 @@ export function CalendarGrid({
   )
   const handleEventDidMount = useCallback(
     (arg: EventMountArg) => {
-      if (arg.event.id === DRAFT_EVENT_ID) onDraftElement?.(arg.el)
+      if (arg.event.id === DRAFT_EVENT_ID) {
+        onDraftElement?.(arg.el)
+        return
+      }
+      // Så att tangentbordshanteringen vet vilken händelse ett fokuserat element är.
+      const props = eventPropsSchema.safeParse(arg.event.extendedProps)
+      if (props.success) {
+        arg.el.dataset[CALENDAR_ID_ATTRIBUTE] = props.data.calendarId
+        arg.el.dataset[EVENT_ID_ATTRIBUTE] = props.data.eventId
+      }
     },
     [onDraftElement],
+  )
+
+  // Delete/Backspace tar bort och Ctrl/Cmd+D duplicerar händelsen som har fokus (Tab eller ett klick som stängts).
+  const handleKeyDown = useCallback(
+    (keyEvent: KeyboardEvent<HTMLDivElement>) => {
+      if (!(keyEvent.target instanceof HTMLElement)) return
+      const element = keyEvent.target.closest<HTMLElement>('.fc-event')
+      // Bara när själva händelsen har fokus, inte något inuti den.
+      if (element !== keyEvent.target) return
+      const calendarId = element.dataset[CALENDAR_ID_ATTRIBUTE]
+      const eventId = element.dataset[EVENT_ID_ATTRIBUTE]
+      if (calendarId === undefined || eventId === undefined) return
+      const ref = { calendarId, eventId }
+
+      if (keyEvent.key === 'Delete' || keyEvent.key === 'Backspace') {
+        if (onEventDelete === undefined) return
+        keyEvent.preventDefault()
+        onEventDelete(ref)
+      } else if (
+        keyEvent.key.toLowerCase() === 'd' &&
+        (keyEvent.ctrlKey || keyEvent.metaKey) &&
+        !keyEvent.altKey &&
+        !keyEvent.shiftKey
+      ) {
+        if (onEventDuplicate === undefined) return
+        // Annars sparar webbläsaren sidan som bokmärke.
+        keyEvent.preventDefault()
+        onEventDuplicate(ref)
+      }
+    },
+    [onEventDelete, onEventDuplicate],
   )
 
   const handleEventClick = useCallback(
@@ -252,9 +308,15 @@ export function CalendarGrid({
         arg.revert()
         return
       }
+      // Alt+dra duplicerar: originalet ligger kvar och kopian hamnar där man släppte.
+      if (kind === 'move' && arg.jsEvent.altKey && onEventCopy) {
+        arg.revert()
+        onEventCopy(props.data, to)
+        return
+      }
       onEventTimeChange({ ...props.data, kind, to })
     },
-    [dragCancel, onEventTimeChange],
+    [dragCancel, onEventTimeChange, onEventCopy],
   )
   const handleEventDrop = useCallback(
     (arg: EventDropArg) => {
@@ -270,7 +332,12 @@ export function CalendarGrid({
   )
 
   return (
-    <div className="sc-calendar-grid" role="region" aria-label={ariaLabel}>
+    <div
+      className="sc-calendar-grid"
+      role="region"
+      aria-label={ariaLabel}
+      onKeyDown={handleKeyDown}
+    >
       <FullCalendar
         ref={calendarRef}
         plugins={PLUGINS}

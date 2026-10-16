@@ -134,6 +134,26 @@ describe('createEventCommand', () => {
     expect(ctx.cached()[0]).toMatchObject({ location: 'Gymmet' })
   })
 
+  it('tar med beskrivning och påminnelser när en händelse kopieras', async () => {
+    const reminders = { useDefault: false, overrides: [{ method: 'email', minutes: 60 }] } as const
+    const pending = ctx.manager.execute(
+      ctx.command({ ...INPUT, description: 'Ta med kaffe', reminders, important: true }),
+    )
+
+    // Syns med alla fält direkt, innan Google svarat.
+    expect(ctx.cached()[0]).toMatchObject({
+      description: 'Ta med kaffe',
+      reminders,
+      important: true,
+    })
+    await pending
+    expect(ctx.calls[0]?.body).toMatchObject({
+      description: 'Ta med kaffe',
+      reminders,
+      extendedProperties: { private: { scImportant: '1' } },
+    })
+  })
+
   it('rullar tillbaka och rapporterar när Google svarar med fel', async () => {
     ctx = setup({ failInsert: () => new GoogleApiError('forbidden', 403) })
     const events: string[] = []

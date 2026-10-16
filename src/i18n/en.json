@@ -142,6 +142,12 @@
         "cancel": "Cancel"
       }
     },
+    "delete": {
+      "label": "Delete {{title}}"
+    },
+    "duplicate": {
+      "label": "Duplicate {{title}}"
+    },
     "fields": {
       "allDay": "All day",
       "startDate": "Start date",
@@ -163,6 +169,8 @@
       "save": "Save",
       "cancel": "Cancel",
       "close": "Close",
+      "delete": "Delete",
+      "duplicate": "Duplicate",
       "readOnly": {
         "calendar": "You only have read access to this calendar, so the event can't be changed.",
         "recurring": "Recurring events can't be changed yet."

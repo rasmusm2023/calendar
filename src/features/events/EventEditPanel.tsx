@@ -23,6 +23,10 @@ export interface EventEditPanelProps {
   timeZone: string
   /** Anropas med bara de fält som ändrats. Anropas inte om inget ändrats. */
   onSave: (edit: EventEdit) => void
+  /** Tar bort händelsen. Utan den visas ingen Ta bort-knapp. Osparade ändringar i panelen kastas. */
+  onDelete?: () => void
+  /** Duplicerar händelsen som den var när panelen öppnades. Utan den visas ingen Duplicera-knapp. */
+  onDuplicate?: () => void
   onClose: () => void
 }
 
@@ -40,6 +44,8 @@ export function EventEditPanel({
   readOnlyReason,
   timeZone,
   onSave,
+  onDelete,
+  onDuplicate,
   onClose,
 }: EventEditPanelProps) {
   const { t } = useTranslation()
@@ -157,6 +163,33 @@ export function EventEditPanel({
 
           {/* Fast i nederkanten, så att Spara alltid syns även när panelen måste rullas. */}
           <div className="sticky -bottom-6 -mx-6 -mb-6 flex justify-end gap-2 border-t bg-background px-6 py-3">
+            <div className="mr-auto flex gap-2">
+              {onDuplicate !== undefined && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    onDuplicate()
+                    onClose()
+                  }}
+                >
+                  {t('event.edit.duplicate')}
+                </Button>
+              )}
+              {onDelete !== undefined && !readOnly && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-destructive"
+                  onClick={() => {
+                    onDelete()
+                    onClose()
+                  }}
+                >
+                  {t('event.edit.delete')}
+                </Button>
+              )}
+            </div>
             <Button type="button" variant="ghost" onClick={onClose}>
               {t(readOnly ? 'event.edit.close' : 'event.edit.cancel')}
             </Button>

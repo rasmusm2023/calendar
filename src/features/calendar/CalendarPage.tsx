@@ -12,6 +12,8 @@ import {
   useCreateEvent,
   useEventsForCalendars,
   usePrefetchEvents,
+  useDeleteEvent,
+  useDuplicateEvent,
   useUpdateEvent,
   useUpdateEventTime,
   type CreateEventInput,
@@ -110,6 +112,8 @@ export function CalendarPage() {
   const createEvent = useCreateEvent(timeZone)
   const updateEventTime = useUpdateEventTime(timeZone)
   const updateEvent = useUpdateEvent(timeZone)
+  const deleteEvent = useDeleteEvent(timeZone)
+  const duplicateEvent = useDuplicateEvent(timeZone)
   // Händelsen som visas i redigeringspanelen, som den såg ut när man klickade på den.
   const [editing, setEditing] = useState<CalEvent | null>(null)
   const gridArea = useRef<HTMLDivElement>(null)
@@ -182,6 +186,30 @@ export function CalendarPage() {
   if (editing?.recurringEventId !== undefined) readOnlyReason = 'recurring'
   else if (editing !== null && !editableCalendarIds.has(editing.calendarId))
     readOnlyReason = 'calendar'
+  // Ta bort och duplicera kräver att kalendern går att skriva i. Instanser av återkommande händelser går
+  // att duplicera (kopian blir en vanlig händelse) men inte att ta bort förrän 1.9.
+  const findEvent = useCallback(
+    (ref: { calendarId: string; eventId: string }) =>
+      events.find((e) => e.calendarId === ref.calendarId && e.id === ref.eventId),
+    [events],
+  )
+  const requestDelete = useCallback(
+    (ref: { calendarId: string; eventId: string }) => {
+      const found = findEvent(ref)
+      if (found === undefined || found.recurringEventId !== undefined) return
+      if (!editableCalendarIds.has(found.calendarId)) return
+      deleteEvent(ref)
+    },
+    [findEvent, editableCalendarIds, deleteEvent],
+  )
+  const requestDuplicate = useCallback(
+    (ref: { calendarId: string; eventId: string }, time?: EventTime) => {
+      const found = findEvent(ref)
+      if (found === undefined || !editableCalendarIds.has(found.calendarId)) return
+      duplicateEvent(ref, time)
+    },
+    [findEvent, editableCalendarIds, duplicateEvent],
+  )
   const closeEditing = useCallback(() => {
     setEditing(null)
   }, [])
@@ -351,6 +379,9 @@ export function CalendarPage() {
               editableCalendarIds={editableCalendarIds}
               onEventTimeChange={updateEventTime}
               onEventClick={openEvent}
+              onEventDelete={requestDelete}
+              onEventDuplicate={requestDuplicate}
+              onEventCopy={requestDuplicate}
               {...(defaultCalendarId !== undefined && { onSelectTime: startDraft })}
             />
           </div>
@@ -379,6 +410,16 @@ export function CalendarPage() {
           onSave={(edit) => {
             updateEvent({ calendarId: editing.calendarId, eventId: editing.id, edit })
           }}
+          {...(readOnlyReason === undefined && {
+            onDelete: () => {
+              requestDelete({ calendarId: editing.calendarId, eventId: editing.id })
+            },
+          })}
+          {...(editableCalendarIds.has(editing.calendarId) && {
+            onDuplicate: () => {
+              requestDuplicate({ calendarId: editing.calendarId, eventId: editing.id })
+            },
+          })}
           onClose={closeEditing}
         />
       )}

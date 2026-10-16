@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import type { StyleContext } from '@/features/events'
 import { TEST_CALENDAR_COLOR } from '@/test/fixtures'
 import type { CalEvent } from '@/types'
@@ -231,6 +232,68 @@ describe('CalendarGrid', () => {
       rerender(ui({ events, view: view('day') }))
       expect(columnDates(container)).toEqual(['2026-10-21'])
       expect(screen.getByText('Händelse a')).toBeInTheDocument()
+    })
+  })
+
+  describe('tangentbord', () => {
+    function renderWithHandlers() {
+      const onEventDelete = vi.fn()
+      const onEventDuplicate = vi.fn()
+      render(
+        <CalendarGrid
+          events={[event('a')]}
+          styleContext={STYLE}
+          view={WEEK}
+          date={WEDNESDAY}
+          locale="sv"
+          ariaLabel="Kalender"
+          onEventDelete={onEventDelete}
+          onEventDuplicate={onEventDuplicate}
+        />,
+      )
+      const block = screen.getByText('Händelse a').closest<HTMLElement>('.fc-event')
+      if (block === null) throw new Error('Händelsen ritades inte')
+      return { block, onEventDelete, onEventDuplicate, user: userEvent.setup() }
+    }
+
+    it('Delete och Backspace på en fokuserad händelse ber om att ta bort den', async () => {
+      const { block, onEventDelete, user } = renderWithHandlers()
+      block.focus()
+
+      await user.keyboard('{Delete}')
+      await user.keyboard('{Backspace}')
+
+      expect(onEventDelete).toHaveBeenCalledTimes(2)
+      expect(onEventDelete).toHaveBeenCalledWith({ calendarId: 'work', eventId: 'a' })
+    })
+
+    it('Ctrl+D duplicerar den fokuserade händelsen och stoppar webbläsarens bokmärke', async () => {
+      const { block, onEventDuplicate, user } = renderWithHandlers()
+      block.focus()
+
+      await user.keyboard('{Control>}d{/Control}')
+
+      expect(onEventDuplicate).toHaveBeenCalledExactlyOnceWith({ calendarId: 'work', eventId: 'a' })
+    })
+
+    it('Cmd+D duplicerar också (Mac)', async () => {
+      const { block, onEventDuplicate, user } = renderWithHandlers()
+      block.focus()
+
+      await user.keyboard('{Meta>}d{/Meta}')
+
+      expect(onEventDuplicate).toHaveBeenCalledOnce()
+    })
+
+    it('gör ingenting utan fokus på en händelse, eller med bara D', async () => {
+      const { block, onEventDelete, onEventDuplicate, user } = renderWithHandlers()
+
+      await user.keyboard('{Delete}{Control>}d{/Control}')
+      block.focus()
+      await user.keyboard('d')
+
+      expect(onEventDelete).not.toHaveBeenCalled()
+      expect(onEventDuplicate).not.toHaveBeenCalled()
     })
   })
 })

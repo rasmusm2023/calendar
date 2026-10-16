@@ -126,6 +126,25 @@ describe('insertEvent', () => {
     expect(event.allDay).toBe(true)
   })
 
+  it('skickar beskrivning och påminnelser när de anges (t.ex. en kopia av en händelse)', async () => {
+    const { client, writes } = fakeClient()
+
+    await insertEvent(
+      client,
+      {
+        ...timed,
+        description: 'Ta med kaffe',
+        reminders: { useDefault: false, overrides: [{ method: 'email', minutes: 60 }] },
+      },
+      { timeZone: TZ },
+    )
+
+    expect(body(writes[0])).toMatchObject({
+      description: 'Ta med kaffe',
+      reminders: { useDefault: false, overrides: [{ method: 'email', minutes: 60 }] },
+    })
+  })
+
   it('lagrar Viktig och familj i extendedProperties.private', async () => {
     const { client, writes } = fakeClient()
 

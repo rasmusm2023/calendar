@@ -7,7 +7,7 @@ import {
   type GoogleClient,
 } from '@/lib/google'
 import type { UndoCommand } from '@/lib/undo'
-import type { CalEvent } from '@/types'
+import type { CalEvent, EventReminders } from '@/types'
 import {
   addEventToCache,
   cancelEventQueries,
@@ -19,6 +19,21 @@ export interface CreateEventInput extends EventTime {
   calendarId: string
   title: string
   location?: string
+  /** Följande används när en händelse kopieras (duplicera, ångra borttagning). */
+  description?: string
+  reminders?: EventReminders
+  familyId?: string
+  important?: boolean
+}
+
+/** Fälten som följer med in i en ny händelse, utan det som är unikt för den (id, etag). */
+function extraFields(input: CreateEventInput) {
+  return {
+    ...(input.location !== undefined && { location: input.location }),
+    ...(input.description !== undefined && { description: input.description }),
+    ...(input.reminders !== undefined && { reminders: input.reminders }),
+    ...(input.familyId !== undefined && { familyId: input.familyId }),
+  }
 }
 
 export interface CreateEventContext {
@@ -65,8 +80,8 @@ export function createEventCommand(
     start: input.start,
     end: input.end,
     allDay: input.allDay,
-    ...(input.location !== undefined && { location: input.location }),
-    important: false,
+    ...extraFields(input),
+    important: input.important === true,
   })
 
   const ref = () => ({ calendarId, eventId })
@@ -95,7 +110,8 @@ export function createEventCommand(
             start: input.start,
             end: input.end,
             allDay: input.allDay,
-            ...(input.location !== undefined && { location: input.location }),
+            ...extraFields(input),
+            ...(input.important !== undefined && { important: input.important }),
           },
           { timeZone },
         )

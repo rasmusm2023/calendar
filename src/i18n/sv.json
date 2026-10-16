@@ -142,6 +142,12 @@
         "cancel": "Avbryt"
       }
     },
+    "delete": {
+      "label": "Ta bort {{title}}"
+    },
+    "duplicate": {
+      "label": "Duplicera {{title}}"
+    },
     "fields": {
       "allDay": "Heldag",
       "startDate": "Startdatum",
@@ -163,6 +169,8 @@
       "save": "Spara",
       "cancel": "Avbryt",
       "close": "Stäng",
+      "delete": "Ta bort",
+      "duplicate": "Duplicera",
       "readOnly": {
         "calendar": "Du har bara läsrätt i den här kalendern, så händelsen går inte att ändra.",
         "recurring": "Återkommande händelser går inte att ändra ännu."

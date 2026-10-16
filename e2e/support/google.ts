@@ -124,6 +124,9 @@ function delay(ms: number) {
 interface InsertBody {
   id: string
   summary?: string
+  location?: string
+  description?: string
+  reminders?: FakeReminders
   start: { date?: string; dateTime?: string }
   end: { date?: string; dateTime?: string }
 }
@@ -152,6 +155,9 @@ function fromInsertBody(body: InsertBody): FakeEvent {
   return {
     id: body.id,
     title: body.summary ?? '',
+    ...(body.location !== undefined && { location: body.location }),
+    ...(body.description !== undefined && { description: body.description }),
+    ...(body.reminders !== undefined && { reminders: body.reminders }),
     start: body.start.date ?? body.start.dateTime ?? '',
     end: body.end.date ?? body.end.dateTime ?? '',
     allDay,
