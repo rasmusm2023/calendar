@@ -81,7 +81,8 @@ P1 Flytta en händelse till en annan kalender (Googles move).
 P0 Flytta en händelse inom en dag och mellan dagar.
 P0 Ändra längd genom att dra i nederkanten. Ändra starttid genom att dra i överkanten.
 P0 Dra mellan heldagsraden och tidsrutnätet. Det konverterar mellan heldag och tidsbestämd händelse (standardlängd 1 h).
-P0 Snäpp till 15 min. Håll Alt för 5 min och Shift för att stänga av snäppningen.
+P0 Snäpp till 15 min. Exakta tider ställs in i redigeringspanelen. (Alt är reserverat för att duplicera med Alt+dra, se 6.3.)
+P2 Håll Shift för att stänga av snäppningen under dragning.
 P0 Spöke eller förhandsvisning visar exakt ny tid under dragningen.
 P0 Optimistisk uppdatering: ändringen syns direkt, synkas i bakgrunden och rullas tillbaka med ett tydligt felmeddelande om Google svarar med fel.
 P0 Esc avbryter en pågående dragning.

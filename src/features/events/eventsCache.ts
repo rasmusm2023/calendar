@@ -65,6 +65,34 @@ export function addEventToCache(queryClient: QueryClient, event: CalEvent): void
   }
 }
 
+/** Händelsen som den ligger i cachen just nu (med optimistiska ändringar), eller `undefined` om den inte finns där. */
+export function findEventInCache(
+  queryClient: QueryClient,
+  ref: { calendarId: string; eventId: string },
+): CalEvent | undefined {
+  for (const { key } of entriesFor(queryClient, ref.calendarId)) {
+    const found = queryClient
+      .getQueryData<EventsResult>(key)
+      ?.events.find((event) => event.id === ref.eventId)
+    if (found) return found
+  }
+  return undefined
+}
+
+/**
+ * Ändrar fält på en händelse som redan finns i cachen. Händelsen flyttas mellan intervall om tiden
+ * ändras. Finns den inte i cachen görs ingenting.
+ */
+export function updateEventInCache(
+  queryClient: QueryClient,
+  ref: { calendarId: string; eventId: string },
+  changes: Partial<Omit<CalEvent, 'id' | 'calendarId'>>,
+): void {
+  const current = findEventInCache(queryClient, ref)
+  if (current === undefined) return
+  addEventToCache(queryClient, { ...current, ...changes })
+}
+
 /** Tar bort händelsen ur alla cachade intervall för kalendern. */
 export function removeEventFromCache(
   queryClient: QueryClient,

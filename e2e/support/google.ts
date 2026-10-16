@@ -17,6 +17,9 @@ export interface FakeCalendar {
   color: string
   selected?: boolean
   primary?: boolean
+  /** Googles accessRole. Standard owner. 
+eader ger en skrivskyddad kalender. */
+  accessRole?: string
 }
 
 export interface FakeEvent {
@@ -79,9 +82,23 @@ export interface CalendarApiMock {
   /** Alla anrop som gjorts mot händelser. */
   eventRequests: { calendarId: string; timeMin: string; timeMax: string }[]
   /** Skrivande anrop (POST, PATCH, DELETE) mot händelser, i den ordning de kom. */
-  writeRequests: { method: string; path: string; body: unknown }[]
+  writeRequests: { method: string; path: string; body: unknown; ifMatch?: string }[]
   /** Om satt svarar alla skrivande anrop med det här felet. */
   failWrites: { status: number; reason: string } | null
+  /** Fördröjning i ms innan skrivande anrop besvaras. */
+  writeDelayMs: number
+  /** Versionsnummer per kalender/händelse. Ger etag, och ökar vid varje ändring som hos Google. */
+  versions: Record<string, number>
+}
+
+interface PatchBody {
+  summary?: string
+  start?: { date?: string | null; dateTime?: string | null }
+  end?: { date?: string | null; dateTime?: string | null }
+}
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms))
 }
 
 interface InsertBody {
@@ -91,11 +108,15 @@ interface InsertBody {
   end: { date?: string; dateTime?: string }
 }
 
+function versionOf(state: CalendarApiMock, calendarId: string, eventId: string): number {
+  return state.versions[`${calendarId}/${eventId}`] ?? 1
+}
+
 /** Händelsen som Google skickar den (event resource). */
-function toResource(event: FakeEvent) {
+function toResource(event: FakeEvent, version: number) {
   return {
     id: event.id,
-    etag: `"${event.id}"`,
+    etag: `"${event.id}-${String(version)}"`,
     summary: event.title,
     start: event.allDay ? { date: event.start } : { dateTime: event.start },
     end: event.allDay ? { date: event.end } : { dateTime: event.end },
@@ -136,6 +157,8 @@ export async function mockCalendarApi(
     eventRequests: [],
     writeRequests: [],
     failWrites: null,
+    writeDelayMs: 0,
+    versions: {},
   }
 
   await page.route(`${CALENDAR_API}/**`, async (route) => {
@@ -161,7 +184,7 @@ export async function mockCalendarApi(
             id: calendar.id,
             summary: calendar.name,
             backgroundColor: calendar.color,
-            accessRole: 'owner',
+            accessRole: calendar.accessRole ?? 'owner',
             selected: calendar.selected ?? false,
             primary: calendar.primary ?? false,
           })),
@@ -187,7 +210,7 @@ export async function mockCalendarApi(
       const to = Date.parse(timeMax)
       const items = (state.events[calendarId] ?? [])
         .filter((event) => Date.parse(event.start) < to && Date.parse(event.end) > from)
-        .map(toResource)
+        .map((event) => toResource(event, versionOf(state, calendarId, event.id)))
       await route.fulfill({
         headers: CORS_HEADERS,
         contentType: 'application/json',
@@ -214,11 +237,47 @@ export async function mockCalendarApi(
       await route.fulfill({
         headers: CORS_HEADERS,
         contentType: 'application/json',
-        body: JSON.stringify(toResource(event)),
+        body: JSON.stringify(toResource(event, 1)),
       })
       return
     }
 
+    if (eventMatch?.[1] && eventMatch[2] && method === 'PATCH') {
+      const calendarId = decodeURIComponent(eventMatch[1])
+      const eventId = decodeURIComponent(eventMatch[2])
+      const body = request.postDataJSON() as PatchBody
+      const ifMatch = (await request.headerValue('if-match')) ?? undefined
+      state.writeRequests.push({ method, path, body, ...(ifMatch !== undefined && { ifMatch }) })
+      if (state.writeDelayMs > 0) await delay(state.writeDelayMs)
+      if (state.failWrites) {
+        await jsonError(route, state.failWrites.status, state.failWrites.reason)
+        return
+      }
+      const event = (state.events[calendarId] ?? []).find((existing) => existing.id === eventId)
+      if (!event) {
+        await jsonError(route, 404, 'notFound')
+        return
+      }
+      const current = versionOf(state, calendarId, eventId)
+      if (ifMatch !== undefined && ifMatch !== `"${eventId}-${String(current)}"`) {
+        await jsonError(route, 412, 'conditionNotMet')
+        return
+      }
+      if (body.summary !== undefined) event.title = body.summary
+      if (body.start) {
+        // Som hos Google: `null` rensar fältet, så att en händelse byter mellan heldag och tidsbestämd.
+        event.allDay = body.start.date != null
+        event.start = body.start.date ?? body.start.dateTime ?? event.start
+      }
+      if (body.end) event.end = body.end.date ?? body.end.dateTime ?? event.end
+      state.versions[`${calendarId}/${eventId}`] = current + 1
+      await route.fulfill({
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify(toResource(event, current + 1)),
+      })
+      return
+    }
     if (eventMatch?.[1] && eventMatch[2] && method === 'DELETE') {
       const calendarId = decodeURIComponent(eventMatch[1])
       const eventId = decodeURIComponent(eventMatch[2])

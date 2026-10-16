@@ -123,6 +123,12 @@
   },
   "event": {
     "untitled": "(Ingen titel)",
+    "move": {
+      "label": "Flytta {{title}}"
+    },
+    "resize": {
+      "label": "Ändra längd på {{title}}"
+    },
     "create": {
       "toolbar": "Ny händelse",
       "label": "Ny händelse: {{title}}",

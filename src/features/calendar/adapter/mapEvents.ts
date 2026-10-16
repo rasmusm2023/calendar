@@ -8,17 +8,23 @@ export function toFullCalendarId(event: Pick<CalEvent, 'calendarId' | 'id'>): st
   return `${event.calendarId}/${event.id}`
 }
 
+const NO_CALENDARS: ReadonlySet<string> = new Set()
+
 /**
  * Översätter våra händelser till FullCalendars format. Det här är enda stället där vår CalEvent möter
  * FullCalendars EventInput. Färgen räknas ut här via resolveEventStyle och lagras inte på händelsen.
  *
  * Tiderna är ISO-strängar och går vidare utan omräkning. För heldagar är `end` exklusivt hos både Google och
  * FullCalendar.
+ *
+ * Bara händelser i `editableCalendarIds` går att dra och ändra längd på. Instanser av återkommande händelser
+ * går inte det förrän valet "Bara denna / Denna och följande / Alla" finns (steg 1.9).
  */
 export function toFullCalendarEvents(
   events: readonly CalEvent[],
   styleContext: StyleContext,
   untitledLabel = '',
+  editableCalendarIds: ReadonlySet<string> = NO_CALENDARS,
 ): EventInput[] {
   return events.map((event) => {
     const style = resolveEventStyle(event, styleContext)
@@ -31,7 +37,7 @@ export function toFullCalendarEvents(
       backgroundColor: style.bg,
       borderColor: style.border,
       textColor: style.text,
-      editable: false,
+      editable: editableCalendarIds.has(event.calendarId) && event.recurringEventId === undefined,
       extendedProps: { calendarId: event.calendarId, eventId: event.id },
     }
   })

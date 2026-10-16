@@ -29,7 +29,15 @@ export async function openCalendar(
   return api
 }
 
-/** En händelse i rutnätet, hittad på sin titel. */
+/** En händelse i rutnätet, hittad på sin titel. Spöket som visas under en dragning räknas inte. */
 export function eventBlock(page: Page, title: string) {
-  return page.locator('.fc-event', { hasText: title })
+  return page.locator('.fc-event:not(.fc-event-mirror)', { hasText: title })
+}
+
+/** Mitt i en kolumn (idag) p� raden f�r ett klockslag ("HH:mm"), `offsetY` px under radens �verkant. */
+export async function pointAt(page: Page, time: string, offsetY = 4) {
+  const column = await page.locator('.fc-timegrid-col.fc-day-today').boundingBox()
+  const lane = await page.locator(`.fc-timegrid-slot-lane[data-time="${time}:00"]`).boundingBox()
+  if (!column || !lane) throw new Error(`Hittade inte rutn�tet vid ${time}`)
+  return { x: column.x + column.width / 2, y: lane.y + offsetY }
 }

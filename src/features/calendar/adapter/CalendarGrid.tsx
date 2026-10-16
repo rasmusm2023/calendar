@@ -1,14 +1,24 @@
-import type { CalendarOptions, DateSelectArg, DatesSetArg, EventMountArg } from '@fullcalendar/core'
+import type {
+  CalendarOptions,
+  DateSelectArg,
+  DatesSetArg,
+  EventDropArg,
+  EventMountArg,
+} from '@fullcalendar/core'
 import svLocale from '@fullcalendar/core/locales/sv'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin, {
   type DateClickArg as FullCalendarDateClickArg,
+  type EventDragStartArg,
+  type EventResizeDoneArg,
+  type EventResizeStartArg,
 } from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import type { StyleContext } from '@/features/events'
+import { z } from 'zod'
+import type { StyleContext, UpdateEventTimeRequest } from '@/features/events'
 import { getBrowserTimeZone } from '@/lib/dates'
 import type { EventTime } from '@/lib/google'
 import type { CalEvent } from '@/types'
@@ -27,7 +37,8 @@ import {
   type GridDraft,
 } from './mapEvents'
 import { scrollTimeForNow } from './scrollTime'
-import { eventTimeFromClick, eventTimeFromSelection } from './selection'
+import { eventTimeFromClick, eventTimeFromMovedEvent, eventTimeFromSelection } from './selection'
+import { useDragCancel } from './useDragCancel'
 import './calendarGrid.css'
 
 const PLUGINS = [timeGridPlugin, dayGridPlugin, listPlugin, interactionPlugin]
@@ -39,6 +50,9 @@ const MONDAY = 1
 const DEFAULT_SCROLL_TIME = '07:00:00'
 
 const MONTH_VIEW = 'dayGridMonth'
+
+/** Det vi lagt i extendedProps för varje händelse (se 	oFullCalendarEvents). */
+const eventPropsSchema = z.object({ calendarId: z.string(), eventId: z.string() })
 
 /** Snäppning av markeringar i tidsrutnätet (PRD 6.4: 15 min). */
 const SNAP_DURATION = '00:15:00'
@@ -123,6 +137,13 @@ export interface CalendarGridProps {
   onDraftElement?: (element: HTMLElement) => void
   /** Text för händelser utan titel. */
   untitledLabel?: string
+  /** Kalendrar vars händelser går att dra och ändra längd på. Utan den är alla händelser låsta. */
+  editableCalendarIds?: ReadonlySet<string>
+  /**
+   * Användaren släppte en händelse på ny plats eller ändrade dess längd. Får bara den nya tiden: ändringen ska göras
+   * (optimistiskt) av den som tar emot den, och rutnätet ritas om från de nya händelserna.
+   */
+  onEventTimeChange?: (request: UpdateEventTimeRequest) => void
 }
 
 /**
@@ -145,12 +166,14 @@ export function CalendarGrid({
   draft = null,
   onDraftElement,
   untitledLabel = '',
+  editableCalendarIds,
+  onEventTimeChange,
 }: CalendarGridProps) {
   const calendarRef = useRef<FullCalendar>(null)
   const calendarEvents = useMemo(() => {
-    const inputs = toFullCalendarEvents(events, styleContext, untitledLabel)
+    const inputs = toFullCalendarEvents(events, styleContext, untitledLabel, editableCalendarIds)
     return draft ? [...inputs, toFullCalendarDraft(draft, styleContext)] : inputs
-  }, [events, styleContext, untitledLabel, draft])
+  }, [events, styleContext, untitledLabel, editableCalendarIds, draft])
   const views = useMemo(() => buildViews(), [])
 
   // Vy och datum styr kalendern. Används tiden som beroende så att en ny Date med samma värde inte flyttar vyn.
@@ -194,6 +217,46 @@ export function CalendarGrid({
     [onDraftElement],
   )
 
+  // Flytta och ändra längd. Esc under dragningen kastar ändringen (se useDragCancel).
+  const dragCancel = useDragCancel()
+  const handleDragStart = useCallback(
+    (arg: EventDragStartArg | EventResizeStartArg) => {
+      dragCancel.begin(arg.jsEvent)
+    },
+    [dragCancel],
+  )
+  const handleDragStop = useCallback(() => {
+    dragCancel.end()
+  }, [dragCancel])
+  const reportChange = useCallback(
+    (kind: UpdateEventTimeRequest['kind'], arg: EventDropArg | EventResizeDoneArg) => {
+      if (dragCancel.consumeCancel()) {
+        arg.revert()
+        return
+      }
+      const props = eventPropsSchema.safeParse(arg.event.extendedProps)
+      const to = eventTimeFromMovedEvent(arg.event, getBrowserTimeZone())
+      if (!props.success || to === null || !onEventTimeChange) {
+        arg.revert()
+        return
+      }
+      onEventTimeChange({ ...props.data, kind, to })
+    },
+    [dragCancel, onEventTimeChange],
+  )
+  const handleEventDrop = useCallback(
+    (arg: EventDropArg) => {
+      reportChange('move', arg)
+    },
+    [reportChange],
+  )
+  const handleEventResize = useCallback(
+    (arg: EventResizeDoneArg) => {
+      reportChange('resize', arg)
+    },
+    [reportChange],
+  )
+
   return (
     <div className="sc-calendar-grid" role="region" aria-label={ariaLabel}>
       <FullCalendar
@@ -212,7 +275,16 @@ export function CalendarGrid({
         // Fyllda block även för tidsbestämda händelser i månadsvyn (PRD 6.2), i stället för en liten prick.
         // Ställs in här och inte per vy, eftersom FullCalendar läser den från kalenderns egna inställningar.
         eventDisplay={monthFilledBlocks ? 'block' : 'auto'}
-        editable={false}
+        editable={editableCalendarIds !== undefined && onEventTimeChange !== undefined}
+        eventResizableFromStart
+        // Slutet räknas alltid ut, även efter dragning mellan heldag och tid (standardlängd 1 h resp. 1 dag).
+        forceEventDuration
+        eventDragStart={handleDragStart}
+        eventDragStop={handleDragStop}
+        eventResizeStart={handleDragStart}
+        eventResizeStop={handleDragStop}
+        eventDrop={handleEventDrop}
+        eventResize={handleEventResize}
         selectable={onSelectTime !== undefined}
         selectMinDistance={SELECT_MIN_DISTANCE_PX}
         snapDuration={SNAP_DURATION}

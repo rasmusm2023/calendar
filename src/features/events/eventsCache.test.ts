@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { toRfc3339, weekRange } from '@/lib/dates'
 import type { EventsResult } from '@/lib/google'
 import type { CalEvent } from '@/types'
-import { addEventToCache, cancelEventQueries, removeEventFromCache } from './eventsCache'
+import {
+  addEventToCache,
+  cancelEventQueries,
+  findEventInCache,
+  removeEventFromCache,
+  updateEventInCache,
+} from './eventsCache'
 import { queryKeys } from './queryKeys'
 
 const TZ = 'Europe/Stockholm'
@@ -148,6 +154,55 @@ describe('eventsCache', () => {
     })
   })
 
+  describe('findEventInCache', () => {
+    it('hittar händelsen i valfritt cachat intervall för kalendern', () => {
+      queryClient.setQueryData(keyFor('a'), result(event('y')))
+      queryClient.setQueryData(keyFor('a', NEXT_WEEK), result(event('x')))
+
+      expect(findEventInCache(queryClient, { calendarId: 'a', eventId: 'x' })?.id).toBe('x')
+    })
+
+    it('ger undefined för en händelse som saknas eller finns i en annan kalender', () => {
+      queryClient.setQueryData(keyFor('b'), result(event('x', { calendarId: 'b' })))
+
+      expect(findEventInCache(queryClient, { calendarId: 'a', eventId: 'x' })).toBeUndefined()
+    })
+  })
+
+  describe('updateEventInCache', () => {
+    it('ändrar fälten och behåller resten', () => {
+      queryClient.setQueryData(keyFor('a'), result(event('x', { etag: '"1"' })))
+
+      updateEventInCache(queryClient, { calendarId: 'a', eventId: 'x' }, { etag: '"2"' })
+
+      expect(queryClient.getQueryData<EventsResult>(keyFor('a'))?.events).toEqual([
+        expect.objectContaining({ id: 'x', etag: '"2"', title: 'x' }),
+      ])
+    })
+
+    it('flyttar händelsen till rätt intervall när tiden ändras', () => {
+      queryClient.setQueryData(keyFor('a'), result(event('x')))
+      queryClient.setQueryData(keyFor('a', NEXT_WEEK), result())
+
+      updateEventInCache(
+        queryClient,
+        { calendarId: 'a', eventId: 'x' },
+        { start: '2026-10-28T09:00:00+01:00', end: '2026-10-28T10:00:00+01:00' },
+      )
+
+      expect(ids(keyFor('a'))).toEqual([])
+      expect(ids(keyFor('a', NEXT_WEEK))).toEqual(['x'])
+    })
+
+    it('gör ingenting för en händelse som inte finns i cachen', () => {
+      const data = result(event('y'))
+      queryClient.setQueryData(keyFor('a'), data)
+
+      updateEventInCache(queryClient, { calendarId: 'a', eventId: 'x' }, { title: 'Ny' })
+
+      expect(queryClient.getQueryData(keyFor('a'))).toBe(data)
+    })
+  })
   describe('removeEventFromCache', () => {
     it('tar bort händelsen ur alla intervall för kalendern, men inte ur andra kalendrar', () => {
       queryClient.setQueryData(keyFor('a'), result(event('x'), event('y')))

@@ -11,6 +11,7 @@ import {
   useCreateEvent,
   useEventsForCalendars,
   usePrefetchEvents,
+  useUpdateEventTime,
   type CreateEventInput,
   type QuickCreateChange,
   type StyleContext,
@@ -103,11 +104,16 @@ export function CalendarPage() {
 
   // Skapa händelse: ett klick eller en dragning i rutnätet (eller knappen) ger ett utkast och öppnar popovern.
   const createEvent = useCreateEvent(timeZone)
+  const updateEventTime = useUpdateEventTime(timeZone)
   const gridArea = useRef<HTMLDivElement>(null)
   const draftAnchor = useDraftAnchor(gridArea)
   const [draft, setDraft] = useState<Draft | null>(null)
   const nextSession = useRef(0)
   const writableCalendars = useMemo(() => allCalendars.filter(isWritableCalendar), [allCalendars])
+  const editableCalendarIds = useMemo(
+    () => new Set(writableCalendars.map((calendar) => calendar.id)),
+    [writableCalendars],
+  )
   const defaultCalendarId = useMemo(
     () => pickDefaultCalendarId(allCalendars, new Set(visibleCalendars.map((c) => c.id))),
     [allCalendars, visibleCalendars],
@@ -317,6 +323,8 @@ export function CalendarPage() {
               untitledLabel={t('event.untitled')}
               draft={gridDraft}
               onDraftElement={draftAnchor.setElement}
+              editableCalendarIds={editableCalendarIds}
+              onEventTimeChange={updateEventTime}
               {...(defaultCalendarId !== undefined && { onSelectTime: startDraft })}
             />
           </div>

@@ -53,3 +53,28 @@ export function eventTimeFromClick(arg: DateClickArg, timeZone: string): EventTi
     allDay: false,
   }
 }
+
+/** Det vi beh�ver av FullCalendars `EventApi` efter att en h�ndelse flyttats eller f�tt ny l�ngd. */
+export interface MovedEventArg {
+  start: Date | null
+  end: Date | null
+  allDay: boolean
+  startStr: string
+  endStr: string
+}
+
+/**
+ * Tiden f�r en h�ndelse efter dragning eller �ndrad l�ngd. Saknas slut (FullCalendar utel�mnar det f�r en
+ * heldagsdag och f�r standardl�ngd) r�knas det ut: en dag f�r heldag, en timme f�r tidsbest�md. Ger `null`
+ * om h�ndelsen inte har n�gon start.
+ */
+export function eventTimeFromMovedEvent(arg: MovedEventArg, timeZone: string): EventTime | null {
+  if (arg.start === null) return null
+  if (arg.allDay) {
+    const start = datePart(arg.startStr)
+    const end = arg.end === null ? addDaysToDateString(start, 1) : datePart(arg.endStr)
+    return { start, end, allDay: true }
+  }
+  const end = arg.end ?? new Date(arg.start.getTime() + CLICK_EVENT_DURATION_MS)
+  return { start: toRfc3339(arg.start, timeZone), end: toRfc3339(end, timeZone), allDay: false }
+}

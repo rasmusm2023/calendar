@@ -123,6 +123,12 @@
   },
   "event": {
     "untitled": "(No title)",
+    "move": {
+      "label": "Move {{title}}"
+    },
+    "resize": {
+      "label": "Change length of {{title}}"
+    },
     "create": {
       "toolbar": "New event",
       "label": "New event: {{title}}",

@@ -60,13 +60,38 @@ describe('toFullCalendarEvents', () => {
     expect(mapped).toMatchObject({ backgroundColor: FALLBACK_EVENT_COLOR })
   })
 
-  it('gör händelserna skrivskyddade och bär med kalender och händelse-id', () => {
+  it('gör händelserna skrivskyddade som standard och bär med kalender och händelse-id', () => {
     const [mapped] = toFullCalendarEvents([TIMED], { calendarColors: COLORS })
 
     expect(mapped).toMatchObject({
       editable: false,
       extendedProps: { calendarId: 'work', eventId: 'e1' },
     })
+  })
+
+  it('låter bara händelser i redigerbara kalendrar flyttas', () => {
+    const readOnly: CalEvent = { ...TIMED, id: 'e3', calendarId: 'holidays' }
+
+    const [writable, locked] = toFullCalendarEvents(
+      [TIMED, readOnly],
+      { calendarColors: COLORS },
+      '',
+      new Set(['work']),
+    )
+
+    expect(writable?.editable).toBe(true)
+    expect(locked?.editable).toBe(false)
+  })
+
+  it('låter inte instanser av återkommande händelser flyttas ännu', () => {
+    const [instance] = toFullCalendarEvents(
+      [{ ...TIMED, recurringEventId: 'series' }],
+      { calendarColors: COLORS },
+      '',
+      new Set(['work']),
+    )
+
+    expect(instance?.editable).toBe(false)
   })
 
   it('ger unika id:n även när två kalendrar har samma händelse-id', () => {

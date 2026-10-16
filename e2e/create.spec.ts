@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { eventBlock, openCalendar } from './support/app.ts'
+import { eventBlock, openCalendar, pointAt } from './support/app.ts'
 import { clearAuthAccounts } from './support/auth.ts'
 import { fakeGoogle, zonedTime, type CalendarApiMock, type FakeCalendar } from './support/google.ts'
 
@@ -36,14 +36,6 @@ async function openWeek(page: Page, setup?: (api: CalendarApiMock) => void) {
   )
   await expect(eventBlock(page, 'Planering')).toBeVisible()
   return api
-}
-
-/** Mitt i en kolumn (idag) på raden för ett klockslag, strax under radens överkant. */
-async function pointAt(page: Page, time: string, offsetY = 4) {
-  const column = await page.locator('.fc-timegrid-col.fc-day-today').boundingBox()
-  const lane = await page.locator(`.fc-timegrid-slot-lane[data-time="${time}:00"]`).boundingBox()
-  if (!column || !lane) throw new Error(`Hittade inte rutnätet vid ${time}`)
-  return { x: column.x + column.width / 2, y: lane.y + offsetY }
 }
 
 /** Klickar på ett klockslag idag och väntar tills popovern är öppen och titelfältet har fokus (så att inget som skrivs går förlorat). */
