@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { GoogleClient } from '@/lib/google'
 import type { ConnectFailureKey, GoogleAccessState } from './types'
 
 export interface GoogleAccessContextValue {
@@ -11,6 +12,8 @@ export interface GoogleAccessContextValue {
   recheck: () => void
   /** Ger en giltig access token för anrop mot Google. */
   getAccessToken: () => Promise<string>
+  /** Klient för Google Calendar API. Använder access token härifrån och förnyar den vid 401. */
+  client: GoogleClient
   /** Glöm cachad token, t.ex. efter ett 401-svar från Google. */
   invalidateToken: () => void
   /**

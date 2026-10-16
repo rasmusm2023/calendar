@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '@/features/auth'
-import { GisError, GoogleAccessError, needsReconnect, type GoogleAccessReason } from '@/lib/google'
+import {
+  GisError,
+  GoogleAccessError,
+  createGoogleClient,
+  needsReconnect,
+  type GoogleAccessReason,
+} from '@/lib/google'
 import { GoogleAccessContext, type GoogleAccessContextValue } from './GoogleAccessContext'
 import type { ConnectFailureKey, GoogleAccessService, GoogleAccessState } from './types'
 
@@ -105,6 +111,11 @@ export function GoogleAccessProvider({ service, children }: GoogleAccessProvider
     service.invalidateToken()
   }, [service])
 
+  const client = useMemo(
+    () => createGoogleClient({ getAccessToken, invalidateToken }),
+    [getAccessToken, invalidateToken],
+  )
+
   const reportAccessError = useCallback(
     (error: unknown) => {
       if (uid === null) return
@@ -122,10 +133,20 @@ export function GoogleAccessProvider({ service, children }: GoogleAccessProvider
       connect,
       recheck,
       getAccessToken,
+      client,
       invalidateToken,
       reportAccessError,
     }),
-    [state, connectFailure, connect, recheck, getAccessToken, invalidateToken, reportAccessError],
+    [
+      state,
+      connectFailure,
+      connect,
+      recheck,
+      getAccessToken,
+      client,
+      invalidateToken,
+      reportAccessError,
+    ],
   )
 
   return <GoogleAccessContext.Provider value={value}>{children}</GoogleAccessContext.Provider>

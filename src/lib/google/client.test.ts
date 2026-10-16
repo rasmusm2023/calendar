@@ -297,3 +297,50 @@ describe('createGoogleClient', () => {
     })
   })
 })
+
+describe('samtidiga anrop', () => {
+  it('släpper in högst maxConcurrent anrop åt gången och köar resten', async () => {
+    let inFlight = 0
+    let maxInFlight = 0
+    const fetchFn = vi.fn<typeof fetch>(async () => {
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight -= 1
+      return json({ ok: true })
+    })
+    const client = createGoogleClient({
+      getAccessToken: () => Promise.resolve('t'),
+      invalidateToken: () => undefined,
+      fetchFn,
+      maxConcurrent: 3,
+    })
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => client.getJson(`/x/${String(i)}`)),
+    )
+
+    expect(results).toHaveLength(10)
+    expect(fetchFn).toHaveBeenCalledTimes(10)
+    expect(maxInFlight).toBe(3)
+  })
+
+  it('släpper platsen även när ett anrop misslyckas', async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json({}, 404))
+      .mockResolvedValueOnce(json({ ok: true }))
+    const client = createGoogleClient({
+      getAccessToken: () => Promise.resolve('t'),
+      invalidateToken: () => undefined,
+      fetchFn,
+      maxConcurrent: 1,
+    })
+
+    const first = client.getJson('/a')
+    const second = client.getJson('/b')
+
+    await expect(first).rejects.toBeInstanceOf(GoogleApiError)
+    expect(await second).toEqual({ ok: true })
+  })
+})

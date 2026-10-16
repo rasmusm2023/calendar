@@ -1,7 +1,7 @@
 import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { I18nextProvider } from 'react-i18next'
-import { App, ConfigErrorScreen, applySystemTheme } from '@/app'
+import { App, ConfigErrorScreen, QueryProvider, applySystemTheme } from '@/app'
 import { AuthProvider, createFirebaseAuthService } from '@/features/auth'
 import { GoogleAccessProvider, createGoogleAccessService } from '@/features/google-access'
 import { setupAppI18n } from '@/i18n'
@@ -24,7 +24,9 @@ function createContent(): ReactNode {
     return (
       <AuthProvider service={createFirebaseAuthService(auth)}>
         <GoogleAccessProvider service={googleAccess}>
-          <App />
+          <QueryProvider>
+            <App />
+          </QueryProvider>
         </GoogleAccessProvider>
       </AuthProvider>
     )

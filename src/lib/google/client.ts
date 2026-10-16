@@ -27,6 +27,8 @@ export interface GoogleClientOptions {
   baseDelayMs?: number
   /** Längsta väntetid i ms, även om Google ber om längre (standard 30 000). */
   maxDelayMs?: number
+  /** Högsta antal anrop mot Google samtidigt (standard 6). Övriga köas, så att många kalendrar inte slår i rate limit. */
+  maxConcurrent?: number
   /** Byts ut i tester. */
   fetchFn?: typeof fetch
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
@@ -36,6 +38,7 @@ export interface GoogleClientOptions {
 const DEFAULT_MAX_RETRIES = 4
 const DEFAULT_BASE_DELAY_MS = 500
 const DEFAULT_MAX_DELAY_MS = 30_000
+const DEFAULT_MAX_CONCURRENT = 6
 
 /** Googles rate limit-orsaker (403). Det är dessa som det lönar sig att vänta ut. */
 const RATE_LIMIT_REASONS = new Set(['rateLimitExceeded', 'userRateLimitExceeded'])
@@ -135,10 +138,30 @@ export function createGoogleClient(options: GoogleClientOptions): GoogleClient {
     maxRetries = DEFAULT_MAX_RETRIES,
     baseDelayMs = DEFAULT_BASE_DELAY_MS,
     maxDelayMs = DEFAULT_MAX_DELAY_MS,
+    maxConcurrent = DEFAULT_MAX_CONCURRENT,
     fetchFn = fetch,
     sleep = defaultSleep,
     random = Math.random,
   } = options
+
+  let active = 0
+  const waiting: (() => void)[] = []
+
+  /** Släpper in högst `maxConcurrent` anrop åt gången. Väntetid mellan försök håller inte någon plats. */
+  async function withSlot<T>(task: () => Promise<T>): Promise<T> {
+    if (active >= maxConcurrent) {
+      await new Promise<void>((resolve) => {
+        waiting.push(resolve)
+      })
+    }
+    active += 1
+    try {
+      return await task()
+    } finally {
+      active -= 1
+      waiting.shift()?.()
+    }
+  }
 
   /** Exponentiell väntetid med jitter (50–100 % av värdet) så att många klienter inte synkar. */
   function backoffDelay(attempt: number, serverHintMs: number | undefined): number {
@@ -159,10 +182,12 @@ export function createGoogleClient(options: GoogleClientOptions): GoogleClient {
 
         let response: Response
         try {
-          response = await fetchFn(url, {
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-            ...(signal && { signal }),
-          })
+          response = await withSlot(() =>
+            fetchFn(url, {
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+              ...(signal && { signal }),
+            }),
+          )
         } catch (error) {
           // Ett avbrutet anrop är inget fel hos Google och ska inte göras om.
           if (signal?.aborted) throw error
