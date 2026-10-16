@@ -34,6 +34,11 @@
     },
     "refreshing": "Updating…",
     "noCalendars": "You have no calendars to show.",
+    "noneSelected": "No calendars are selected. Choose one or more in the list.",
+    "picker": {
+      "label": "Calendars",
+      "reset": "Reset to Google's selection"
+    },
     "loadError": {
       "title": "Could not load your calendars",
       "network": "Check your internet connection and try again.",

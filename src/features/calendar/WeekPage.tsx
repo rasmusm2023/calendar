@@ -6,8 +6,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useCalendars, useEventsForCalendars, type StyleContext } from '@/features/events'
 import { getBrowserTimeZone, shiftWeekRange, weekRange } from '@/lib/dates'
 import { GoogleApiError } from '@/lib/google'
-import type { CalendarInfo } from '@/types'
 import { WeekCalendar } from './adapter/WeekCalendar'
+import { CalendarPicker } from './CalendarPicker'
+import { useCalendarSelection } from './useCalendarSelection'
 import { WeekToolbar } from './WeekToolbar'
 import { formatWeekSpan, weekNumber } from './weekTitle'
 
@@ -21,15 +22,6 @@ function loadErrorKey(error: unknown): LoadErrorKey {
   return 'generic'
 }
 
-/**
- * Kalendrar som visas. Fas 0: de som är "tända" i Google Calendar. Har användaren släckt alla visas alla,
- * så att vyn aldrig blir tom av misstag. Eget val av kalendrar kommer i steg 0.17b.
- */
-function pickVisibleCalendars(calendars: readonly CalendarInfo[]): CalendarInfo[] {
-  const selected = calendars.filter((calendar) => calendar.selected)
-  return selected.length > 0 ? selected : [...calendars]
-}
-
 /** Veckovyn: kalenderlista, händelser för veckan och navigering mellan veckor. Skrivskyddad i Fas 0. */
 export function WeekPage() {
   const { t, i18n } = useTranslation()
@@ -40,10 +32,9 @@ export function WeekPage() {
   const range = useMemo(() => weekRange(anchor, timeZone), [anchor, timeZone])
 
   const calendarsQuery = useCalendars()
-  const visibleCalendars = useMemo(
-    () => pickVisibleCalendars(calendarsQuery.data?.calendars ?? []),
-    [calendarsQuery.data],
-  )
+  const allCalendars = useMemo(() => calendarsQuery.data?.calendars ?? [], [calendarsQuery.data])
+  const selection = useCalendarSelection(allCalendars)
+  const visibleCalendars = selection.visible
   const styleContext = useMemo<StyleContext>(
     () => ({
       calendarColors: new Map(visibleCalendars.map((c) => [c.id, c.backgroundColor])),
@@ -147,7 +138,9 @@ export function WeekPage() {
       )}
       {visibleCalendars.length === 0 && (
         <Alert data-testid="calendar-empty">
-          <AlertDescription>{t('calendar.noCalendars')}</AlertDescription>
+          <AlertDescription>
+            {allCalendars.length === 0 ? t('calendar.noCalendars') : t('calendar.noneSelected')}
+          </AlertDescription>
         </Alert>
       )}
     </>
@@ -156,15 +149,33 @@ export function WeekPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {toolbar}
-      <div className="flex flex-col gap-2 px-4 pt-2 empty:hidden">{notices}</div>
-      <div className="min-h-0 flex-1 p-2">
-        <WeekCalendar
-          events={week.events}
-          styleContext={styleContext}
-          date={anchor}
-          locale={locale}
-          ariaLabel={t('calendar.label')}
-        />
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        {allCalendars.length > 0 && (
+          <aside
+            aria-label={t('calendar.picker.label')}
+            className="max-h-40 shrink-0 overflow-y-auto border-b p-3 md:max-h-none md:w-56 md:border-r md:border-b-0"
+          >
+            <CalendarPicker
+              calendars={allCalendars}
+              isVisible={selection.isVisible}
+              onToggle={selection.toggle}
+              isCustom={selection.isCustom}
+              onReset={selection.reset}
+            />
+          </aside>
+        )}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex flex-col gap-2 px-4 pt-2 empty:hidden">{notices}</div>
+          <div className="min-h-0 flex-1 p-2">
+            <WeekCalendar
+              events={week.events}
+              styleContext={styleContext}
+              date={anchor}
+              locale={locale}
+              ariaLabel={t('calendar.label')}
+            />
+          </div>
+        </div>
       </div>
     </div>
   )

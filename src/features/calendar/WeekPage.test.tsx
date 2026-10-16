@@ -2,8 +2,10 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AuthProvider } from '@/features/auth'
 import { createI18n } from '@/i18n'
 import { GoogleApiError, type QueryParams } from '@/lib/google'
+import { createFakeAuthService, TEST_USER, type InitialAuth } from '@/test/fakeAuthService'
 import { setupFakeGoogleClient, type Responder } from '@/test/fakeGoogleClient'
 import { TEST_CALENDAR_COLOR } from '@/test/fixtures'
 import { WeekPage } from './WeekPage'
@@ -33,12 +35,14 @@ interface Options {
   calendars?: Record<string, unknown>[]
   events?: (calendarId: string, params: QueryParams) => unknown
   responder?: Responder
+  auth?: InitialAuth
 }
 
 async function renderPage({
   calendars = [calendarEntry('a', { selected: true })],
   events = (calendarId) => ({ items: [eventItem(`from-${calendarId}`)] }),
   responder,
+  auth = TEST_USER,
 }: Options = {}) {
   const fake = setupFakeGoogleClient(
     responder ??
@@ -48,14 +52,17 @@ async function renderPage({
           : events(calendarIdOf(path), params)),
   )
   const i18n = await createI18n('sv')
-  render(
+  const authService = createFakeAuthService(auth)
+  const { unmount } = render(
     <I18nextProvider i18n={i18n}>
-      <fake.Wrapper>
-        <WeekPage />
-      </fake.Wrapper>
+      <AuthProvider service={authService.service}>
+        <fake.Wrapper>
+          <WeekPage />
+        </fake.Wrapper>
+      </AuthProvider>
     </I18nextProvider>,
   )
-  return { ...fake, user: userEvent.setup({ advanceTimers: vi.advanceTimersByTime }) }
+  return { ...fake, unmount, user: userEvent.setup({ advanceTimers: vi.advanceTimersByTime }) }
 }
 
 function eventCalls(getJson: ReturnType<typeof setupFakeGoogleClient>['getJson']) {
@@ -64,6 +71,7 @@ function eventCalls(getJson: ReturnType<typeof setupFakeGoogleClient>['getJson']
 
 describe('WeekPage', () => {
   beforeEach(() => {
+    window.localStorage.clear()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(NOW)
   })
@@ -188,5 +196,91 @@ describe('WeekPage', () => {
     await renderPage({ calendars: [] })
 
     expect(await screen.findByTestId('calendar-empty')).toHaveTextContent('inga kalendrar')
+  })
+
+  describe('kalendervalg', () => {
+    const TWO = [calendarEntry('a', { selected: true }), calendarEntry('b', { selected: false })]
+
+    it('listar alla kalendrar med Googles val ikryssade', async () => {
+      await renderPage({ calendars: TWO })
+      await screen.findByText('Händelse from-a')
+
+      expect(screen.getByRole('checkbox', { name: 'a' })).toBeChecked()
+      expect(screen.getByRole('checkbox', { name: 'b' })).not.toBeChecked()
+      expect(screen.queryByRole('button', { name: 'Återställ till Googles val' })).toBeNull()
+    })
+
+    it('visar flera kalendrar samtidigt och döljer en som avmarkeras', async () => {
+      const { user, getJson } = await renderPage({ calendars: TWO })
+      await screen.findByText('Händelse from-a')
+
+      await user.click(screen.getByRole('checkbox', { name: 'b' }))
+      expect(await screen.findByText('Händelse from-b')).toBeInTheDocument()
+      expect(screen.getByText('Händelse from-a')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('checkbox', { name: 'a' }))
+      await waitFor(() => {
+        expect(screen.queryByText('Händelse from-a')).not.toBeInTheDocument()
+      })
+      expect(screen.getByText('Händelse from-b')).toBeInTheDocument()
+      // a hämtades en gång och b en gång. Avmarkeringen gav inga nya anrop.
+      expect(eventCalls(getJson)).toHaveLength(2)
+    })
+
+    it('sparar valet lokalt och återställer det vid nästa besök', async () => {
+      const first = await renderPage({ calendars: TWO })
+      await screen.findByText('Händelse from-a')
+      await first.user.click(screen.getByRole('checkbox', { name: 'b' }))
+      await screen.findByText('Händelse from-b')
+      first.unmount()
+
+      await renderPage({ calendars: TWO })
+
+      expect(await screen.findByText('Händelse from-b')).toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: 'a' })).toBeChecked()
+      expect(screen.getByRole('checkbox', { name: 'b' })).toBeChecked()
+    })
+
+    it('håller valet separat per användare', async () => {
+      window.localStorage.setItem('sc:calendarSelection:other-user', JSON.stringify(['b']))
+
+      await renderPage({ calendars: TWO })
+
+      expect(await screen.findByText('Händelse from-a')).toBeInTheDocument()
+      expect(screen.queryByText('Händelse from-b')).not.toBeInTheDocument()
+    })
+
+    it('går tillbaka till Googles val med Återställ', async () => {
+      window.localStorage.setItem(`sc:calendarSelection:${TEST_USER.uid}`, JSON.stringify(['b']))
+      const { user } = await renderPage({ calendars: TWO })
+      expect(await screen.findByText('Händelse from-b')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Återställ till Googles val' }))
+
+      expect(await screen.findByText('Händelse from-a')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.queryByText('Händelse from-b')).not.toBeInTheDocument()
+      })
+      expect(window.localStorage.getItem(`sc:calendarSelection:${TEST_USER.uid}`)).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Återställ till Googles val' })).toBeNull()
+    })
+
+    it('visar ett tydligt besked när inga kalendrar är valda', async () => {
+      window.localStorage.setItem(`sc:calendarSelection:${TEST_USER.uid}`, JSON.stringify([]))
+
+      await renderPage({ calendars: TWO })
+
+      expect(await screen.findByTestId('calendar-empty')).toHaveTextContent(
+        'Inga kalendrar är valda',
+      )
+      expect(screen.getByRole('checkbox', { name: 'a' })).not.toBeChecked()
+    })
+
+    it('ger kryssrutorna kalenderns namn och en grupp med etikett', async () => {
+      await renderPage({ calendars: TWO })
+      await screen.findByText('Händelse from-a')
+
+      expect(screen.getByRole('group', { name: 'Kalendrar' })).toBeInTheDocument()
+    })
   })
 })

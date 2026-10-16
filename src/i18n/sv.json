@@ -34,6 +34,11 @@
     },
     "refreshing": "Uppdaterar…",
     "noCalendars": "Du har inga kalendrar att visa.",
+    "noneSelected": "Inga kalendrar är valda. Välj en eller flera i listan.",
+    "picker": {
+      "label": "Kalendrar",
+      "reset": "Återställ till Googles val"
+    },
     "loadError": {
       "title": "Det gick inte att hämta dina kalendrar",
       "network": "Kontrollera din internetanslutning och försök igen.",
