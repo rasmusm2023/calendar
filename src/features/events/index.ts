@@ -25,3 +25,10 @@ export { useCreateEvent } from './useCreateEvent'
 export { isWritableCalendar, pickDefaultCalendarId } from './writableCalendars'
 export type { UpdateEventTimeInput } from './updateEventTimeCommand'
 export { useUpdateEventTime, type UpdateEventTimeRequest } from './useUpdateEventTime'
+export { useUpdateEvent, type UpdateEventRequest } from './useUpdateEvent'
+export type { EventEdit } from './eventEdit'
+export {
+  EventEditPanel,
+  type EventEditPanelProps,
+  type EventReadOnlyReason,
+} from './EventEditPanel'

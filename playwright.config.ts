@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = 5173
+// Egen port, skild från `npm run dev` (5173). Annars återanvänds en dev-server mot riktiga Firebase av misstag
+// och testerna loggar in mot riktiga Google i stället för emulatorn.
+const PORT = 5273
 const FUNCTIONS_EMULATOR_PORT = 5001
 const FAKE_GOOGLE_PORT = 9778
 
@@ -38,7 +40,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: 'npm run dev:emulator',
+      command: `npm run dev:emulator -- --port ${String(PORT)} --strictPort`,
       url: `http://localhost:${String(PORT)}`,
       reuseExistingServer: !process.env.CI,
     },

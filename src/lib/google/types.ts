@@ -7,6 +7,16 @@ import { z } from 'zod'
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Förväntade färg som #rrggbb')
 
+/**
+ * En påminnelse. Metoden är en vanlig sträng här: Google kan ha andra (t.ex. `sms`) som appen inte hanterar,
+ * och de ska inte göra att hela händelsen eller kalendern avvisas. Mappern släpper dem.
+ */
+export const googleReminderSchema = z.object({
+  method: z.string(),
+  minutes: z.number().int().min(0),
+})
+export type GoogleReminder = z.infer<typeof googleReminderSchema>
+
 // ---- calendarList ----------------------------------------------------------------------------
 
 export const googleCalendarListEntrySchema = z.object({
@@ -23,6 +33,7 @@ export const googleCalendarListEntrySchema = z.object({
   // Okänd framtida roll behandlas försiktigt som skrivskyddad.
   accessRole: z.enum(['freeBusyReader', 'reader', 'writer', 'owner']).catch('reader'),
   timeZone: z.string().optional(),
+  defaultReminders: z.array(googleReminderSchema).optional(),
 })
 export type GoogleCalendarListEntry = z.infer<typeof googleCalendarListEntrySchema>
 
@@ -43,6 +54,13 @@ export const googleEventSchema = z.object({
   status: z.string().optional(),
   summary: z.string().optional(),
   location: z.string().optional(),
+  description: z.string().optional(),
+  reminders: z
+    .object({
+      useDefault: z.boolean().optional(),
+      overrides: z.array(googleReminderSchema).optional(),
+    })
+    .optional(),
   // Saknas på avbokade händelser.
   start: googleEventTimeSchema.optional(),
   end: googleEventTimeSchema.optional(),

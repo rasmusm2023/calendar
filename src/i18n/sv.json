@@ -137,15 +137,58 @@
         "dialog": "Ny händelse",
         "title": "Titel",
         "titlePlaceholder": "Lägg till titel",
-        "allDay": "Heldag",
-        "startDate": "Startdatum",
-        "startTime": "Starttid",
-        "endDate": "Slutdatum",
-        "endTime": "Sluttid",
         "calendar": "Kalender",
-        "invalidTime": "Kontrollera datum och tider: slutet måste ligga efter början.",
         "save": "Spara",
         "cancel": "Avbryt"
+      }
+    },
+    "fields": {
+      "allDay": "Heldag",
+      "startDate": "Startdatum",
+      "startTime": "Starttid",
+      "endDate": "Slutdatum",
+      "endTime": "Sluttid",
+      "invalidTime": "Kontrollera datum och tider: slutet måste ligga efter början."
+    },
+    "edit": {
+      "label": "Redigera {{title}}",
+      "dialog": "Redigera händelse",
+      "viewDialog": "Händelse",
+      "intro": "Ändra uppgifterna om händelsen.",
+      "title": "Titel",
+      "titlePlaceholder": "Lägg till titel",
+      "location": "Plats",
+      "notes": "Beskrivning",
+      "calendar": "Kalender",
+      "save": "Spara",
+      "cancel": "Avbryt",
+      "close": "Stäng",
+      "readOnly": {
+        "calendar": "Du har bara läsrätt i den här kalendern, så händelsen går inte att ändra.",
+        "recurring": "Återkommande händelser går inte att ändra ännu."
+      }
+    },
+    "reminder": {
+      "heading": "Påminnelser",
+      "useDefault": "Använd kalenderns standard",
+      "defaultNone": "Kalendern har inga standardpåminnelser.",
+      "none": "Inga påminnelser.",
+      "add": "Lägg till påminnelse",
+      "remove": "Ta bort påminnelse {{index}}",
+      "time": "Tid före start, påminnelse {{index}}",
+      "method": "Metod, påminnelse {{index}}",
+      "methods": {
+        "popup": "Avisering",
+        "email": "E-post"
+      },
+      "before": {
+        "atStart": "Vid starten",
+        "minutes_one": "{{count}} minut före",
+        "minutes_other": "{{count}} minuter före",
+        "hours_one": "{{count}} timme före",
+        "hours_other": "{{count}} timmar före",
+        "days_one": "{{count}} dag före",
+        "days_other": "{{count}} dagar före"
       }
     }
   }

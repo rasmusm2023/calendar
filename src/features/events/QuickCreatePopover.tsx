@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useId, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,12 +8,8 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import type { EventTime } from '@/lib/google'
 import type { CalendarInfo } from '@/types'
 import type { CreateEventInput } from './createEventCommand'
-import {
-  changeStart,
-  eventTimeFromForm,
-  formFromEventTime,
-  type FormTimes,
-} from './quickCreateForm'
+import { TimeFields } from './TimeFields'
+import { useTimeForm } from './useTimeForm'
 
 /** Det Radix behöver för att placera popovern: allt som kan mäta sin plats på skärmen. */
 export interface PopoverAnchorTarget {
@@ -58,107 +54,21 @@ export function QuickCreatePopover({
   onCancel,
 }: QuickCreatePopoverProps) {
   const { t } = useTranslation()
-  const ids = {
-    title: useId(),
-    startDate: useId(),
-    startTime: useId(),
-    endDate: useId(),
-    endTime: useId(),
-    calendar: useId(),
-    allDay: useId(),
-    error: useId(),
-  }
+  const ids = { title: useId(), calendar: useId() }
 
   const [title, setTitle] = useState('')
   const [calendarId, setCalendarId] = useState(initialCalendarId)
-  const [form, setForm] = useState<FormTimes>(() => formFromEventTime(initial, timeZone))
-
-  const time = useMemo(() => eventTimeFromForm(form, timeZone), [form, timeZone])
-  // Senaste giltiga tiden. Under redigering är ett fält ibland tomt, och då behövs den för att behålla längden.
-  const lastValid = useRef<EventTime | null>(time)
-  useEffect(() => {
-    if (time !== null) lastValid.current = time
-  }, [time])
+  const timeForm = useTimeForm(initial, timeZone)
+  const { time } = timeForm
 
   useEffect(() => {
     onChange?.({ time, calendarId })
   }, [time, calendarId, onChange])
 
-  const updateStart = (patch: Partial<Pick<FormTimes, 'startDate' | 'startTime'>>) => {
-    const reference = lastValid.current
-    setForm((current) => changeStart(current, patch, timeZone, reference))
-  }
-
   const submit = () => {
     if (time === null) return
     onSubmit({ calendarId, title: title.trim(), ...time })
   }
-
-  const invalid = time === null
-  const timeFields = (
-    <>
-      <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor={ids.startDate}>{t('event.create.quick.startDate')}</Label>
-          <Input
-            id={ids.startDate}
-            type="date"
-            required
-            value={form.startDate}
-            onChange={(event) => {
-              updateStart({ startDate: event.target.value })
-            }}
-          />
-        </div>
-        {!form.allDay && (
-          <div className="grid gap-1.5">
-            <Label htmlFor={ids.startTime}>{t('event.create.quick.startTime')}</Label>
-            <Input
-              id={ids.startTime}
-              type="time"
-              required
-              value={form.startTime}
-              onChange={(event) => {
-                updateStart({ startTime: event.target.value })
-              }}
-            />
-          </div>
-        )}
-      </div>
-      <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor={ids.endDate}>{t('event.create.quick.endDate')}</Label>
-          <Input
-            id={ids.endDate}
-            type="date"
-            required
-            aria-invalid={invalid}
-            aria-describedby={invalid ? ids.error : undefined}
-            value={form.endDate}
-            onChange={(event) => {
-              setForm((current) => ({ ...current, endDate: event.target.value }))
-            }}
-          />
-        </div>
-        {!form.allDay && (
-          <div className="grid gap-1.5">
-            <Label htmlFor={ids.endTime}>{t('event.create.quick.endTime')}</Label>
-            <Input
-              id={ids.endTime}
-              type="time"
-              required
-              aria-invalid={invalid}
-              aria-describedby={invalid ? ids.error : undefined}
-              value={form.endTime}
-              onChange={(event) => {
-                setForm((current) => ({ ...current, endTime: event.target.value }))
-              }}
-            />
-          </div>
-        )}
-      </div>
-    </>
-  )
 
   return (
     <Popover
@@ -198,26 +108,7 @@ export function QuickCreatePopover({
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              id={ids.allDay}
-              type="checkbox"
-              className="size-4 accent-primary"
-              checked={form.allDay}
-              onChange={(event) => {
-                setForm((current) => ({ ...current, allDay: event.target.checked }))
-              }}
-            />
-            <Label htmlFor={ids.allDay}>{t('event.create.quick.allDay')}</Label>
-          </div>
-
-          {timeFields}
-
-          {invalid && (
-            <p id={ids.error} role="alert" className="text-sm text-destructive">
-              {t('event.create.quick.invalidTime')}
-            </p>
-          )}
+          <TimeFields {...timeForm} />
 
           <div className="grid gap-1.5">
             <Label htmlFor={ids.calendar}>{t('event.create.quick.calendar')}</Label>
@@ -240,7 +131,7 @@ export function QuickCreatePopover({
             <Button type="button" variant="ghost" onClick={onCancel}>
               {t('event.create.quick.cancel')}
             </Button>
-            <Button type="submit" disabled={invalid}>
+            <Button type="submit" disabled={time === null}>
               {t('event.create.quick.save')}
             </Button>
           </div>

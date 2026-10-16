@@ -20,11 +20,28 @@ export interface FakeCalendar {
   /** Googles accessRole. Standard owner. 
 eader ger en skrivskyddad kalender. */
   accessRole?: string
+  /** Kalenderns standardpåminnelser (calendarList.defaultReminders). */
+  defaultReminders?: FakeReminder[]
+}
+
+export interface FakeReminder {
+  method: 'popup' | 'email'
+  minutes: number
+}
+
+export interface FakeReminders {
+  useDefault: boolean
+  overrides?: FakeReminder[]
 }
 
 export interface FakeEvent {
   id: string
   title: string
+  location?: string
+  description?: string
+  reminders?: FakeReminders
+  /** Satt = en instans av en återkommande händelse. */
+  recurringEventId?: string
   /** RFC 3339 med offset, eller ett rent datum för heldagshändelser. */
   start: string
   end: string
@@ -93,6 +110,9 @@ export interface CalendarApiMock {
 
 interface PatchBody {
   summary?: string
+  location?: string | null
+  description?: string | null
+  reminders?: FakeReminders
   start?: { date?: string | null; dateTime?: string | null }
   end?: { date?: string | null; dateTime?: string | null }
 }
@@ -118,6 +138,10 @@ function toResource(event: FakeEvent, version: number) {
     id: event.id,
     etag: `"${event.id}-${String(version)}"`,
     summary: event.title,
+    ...(event.location !== undefined && { location: event.location }),
+    ...(event.description !== undefined && { description: event.description }),
+    ...(event.reminders !== undefined && { reminders: event.reminders }),
+    ...(event.recurringEventId !== undefined && { recurringEventId: event.recurringEventId }),
     start: event.allDay ? { date: event.start } : { dateTime: event.start },
     end: event.allDay ? { date: event.end } : { dateTime: event.end },
   }
@@ -187,6 +211,7 @@ export async function mockCalendarApi(
             accessRole: calendar.accessRole ?? 'owner',
             selected: calendar.selected ?? false,
             primary: calendar.primary ?? false,
+            defaultReminders: calendar.defaultReminders ?? [],
           })),
         }),
       })
@@ -264,6 +289,16 @@ export async function mockCalendarApi(
         return
       }
       if (body.summary !== undefined) event.title = body.summary
+      // Som hos Google: `null` tar bort fältet.
+      if (body.location !== undefined) {
+        if (body.location === null) delete event.location
+        else event.location = body.location
+      }
+      if (body.description !== undefined) {
+        if (body.description === null) delete event.description
+        else event.description = body.description
+      }
+      if (body.reminders !== undefined) event.reminders = body.reminders
       if (body.start) {
         // Som hos Google: `null` rensar fältet, så att en händelse byter mellan heldag och tidsbestämd.
         event.allDay = body.start.date != null

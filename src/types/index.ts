@@ -1,2 +1,2 @@
 export type { CalendarAccessRole, CalendarInfo } from './calendar'
-export type { CalEvent } from './event'
+export type { CalEvent, EventReminders, Reminder } from './event'

@@ -343,3 +343,71 @@ describe('getEvent', () => {
     expect(event.title).toBe('Gympass')
   })
 })
+
+describe('patchEvent: beskrivning och påminnelser', () => {
+  it('skickar beskrivning och rensar den med null', async () => {
+    const { client, writes } = fakeClient()
+
+    await patchEvent(client, REF, { description: 'Anteckning' }, { timeZone: TZ })
+    await patchEvent(client, REF, { description: null }, { timeZone: TZ })
+
+    expect(body(writes[0])).toEqual({ description: 'Anteckning' })
+    expect(body(writes[1])).toEqual({ description: null })
+  })
+
+  it('skickar egna påminnelser som en hel lista', async () => {
+    const { client, writes } = fakeClient()
+
+    await patchEvent(
+      client,
+      REF,
+      {
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'popup', minutes: 10 },
+            { method: 'email', minutes: 60 },
+          ],
+        },
+      },
+      { timeZone: TZ },
+    )
+
+    expect(body(writes[0])).toEqual({
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'popup', minutes: 10 },
+          { method: 'email', minutes: 60 },
+        ],
+      },
+    })
+  })
+
+  it('skickar useDefault: true för kalenderns standard, och tom lista för inga påminnelser', async () => {
+    const { client, writes } = fakeClient()
+
+    await patchEvent(client, REF, { reminders: { useDefault: true } }, { timeZone: TZ })
+    await patchEvent(
+      client,
+      REF,
+      { reminders: { useDefault: false, overrides: [] } },
+      { timeZone: TZ },
+    )
+
+    expect(body(writes[0])).toEqual({ reminders: { useDefault: true } })
+    expect(body(writes[1])).toEqual({ reminders: { useDefault: false, overrides: [] } })
+  })
+
+  it('läser tillbaka beskrivning och påminnelser ur svaret', async () => {
+    const { client } = fakeClient({
+      onWrite: () =>
+        googleEvent({ description: 'Ny', reminders: { useDefault: false, overrides: [] } }),
+    })
+
+    const event = await patchEvent(client, REF, { description: 'Ny' }, { timeZone: TZ })
+
+    expect(event.description).toBe('Ny')
+    expect(event.reminders).toEqual({ useDefault: false, overrides: [] })
+  })
+})

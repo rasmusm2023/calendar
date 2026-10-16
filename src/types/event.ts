@@ -7,6 +7,20 @@
  * - heldag: rent datum "2026-10-19". `end` är exklusivt, som hos Google (en heldag på en dag har
  *   end = nästa dag).
  */
+/** En påminnelse på en händelse (Googles `reminders.overrides`). */
+export interface Reminder {
+  method: 'popup' | 'email'
+  /** Minuter före start. */
+  minutes: number
+}
+
+/**
+ * Händelsens påminnelser. `useDefault` betyder kalenderns standardpåminnelser (`CalendarInfo.defaultReminders`),
+ * annars gäller `overrides` (kan vara tom, och då finns inga påminnelser).
+ */
+export type EventReminders =
+  { useDefault: true } | { useDefault: false; overrides: readonly Reminder[] }
+
 export interface CalEvent {
   id: string
   calendarId: string
@@ -17,6 +31,9 @@ export interface CalEvent {
   end: string
   allDay: boolean
   location?: string
+  description?: string
+  /** Saknas om Google inte skickat något, vilket betyder kalenderns standard. */
+  reminders?: EventReminders
   /** Satt på instanser av en återkommande händelse (Google expanderar åt oss, singleEvents=true). */
   recurringEventId?: string
   /** Explicit familj från extendedProperties.private.scFamilyId. Används från Fas 2. */

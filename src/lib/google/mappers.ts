@@ -1,5 +1,5 @@
 import { localDateTimeToRfc3339, parseIsoInZone } from '@/lib/dates'
-import type { CalendarInfo, CalEvent } from '@/types'
+import type { CalendarInfo, CalEvent, EventReminders, Reminder } from '@/types'
 import {
   googleCalendarListEntrySchema,
   googleCalendarListPageSchema,
@@ -7,6 +7,7 @@ import {
   googleEventsPageSchema,
   type GoogleEvent,
   type GoogleEventTime,
+  type GoogleReminder,
 } from './types'
 
 /** En post som inte gick att tolka. Posten hoppas över och problemet rapporteras, inte göms. */
@@ -74,6 +75,21 @@ function mapTime(
   throw new Error(`${label} saknar både date och dateTime`)
 }
 
+/** Påminnelser med en metod som appen hanterar (popup och e-post). Andra, t.ex. sms, släpps. */
+function mapReminderList(list: readonly GoogleReminder[] | undefined): Reminder[] {
+  const reminders: Reminder[] = []
+  for (const { method, minutes } of list ?? []) {
+    if (method === 'popup' || method === 'email') reminders.push({ method, minutes })
+  }
+  return reminders
+}
+
+function mapReminders(raw: GoogleEvent['reminders']): EventReminders | undefined {
+  if (raw === undefined) return undefined
+  if (raw.useDefault === true) return { useDefault: true }
+  return { useDefault: false, overrides: mapReminderList(raw.overrides) }
+}
+
 /**
  * Googles händelse -> CalEvent. Returnerar null för avbokade händelser (de ska inte visas).
  * Kastar för händelser som saknar eller har inkonsekvent start/slut.
@@ -104,6 +120,9 @@ export function mapGoogleEvent(raw: GoogleEvent, ctx: MapEventContext): CalEvent
     important: appFields?.scImportant === '1',
   }
   if (raw.location !== undefined) event.location = raw.location
+  if (raw.description !== undefined && raw.description !== '') event.description = raw.description
+  const reminders = mapReminders(raw.reminders)
+  if (reminders !== undefined) event.reminders = reminders
   if (raw.recurringEventId !== undefined) event.recurringEventId = raw.recurringEventId
   if (familyId !== undefined && familyId !== '') event.familyId = familyId
   return event
@@ -168,6 +187,9 @@ export function parseCalendarListPage(raw: unknown): CalendarsPage {
       accessRole: entry.accessRole,
     }
     if (entry.timeZone !== undefined) calendar.timeZone = entry.timeZone
+    if (entry.defaultReminders !== undefined) {
+      calendar.defaultReminders = mapReminderList(entry.defaultReminders)
+    }
     calendars.push(calendar)
   })
 

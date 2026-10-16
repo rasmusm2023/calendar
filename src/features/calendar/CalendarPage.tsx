@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  EventEditPanel,
   QuickCreatePopover,
   isWritableCalendar,
   pickDefaultCalendarId,
@@ -11,13 +12,16 @@ import {
   useCreateEvent,
   useEventsForCalendars,
   usePrefetchEvents,
+  useUpdateEvent,
   useUpdateEventTime,
   type CreateEventInput,
+  type EventReadOnlyReason,
   type QuickCreateChange,
   type StyleContext,
 } from '@/features/events'
 import { getBrowserTimeZone } from '@/lib/dates'
 import { GoogleAccessError, GoogleApiError, type EventTime } from '@/lib/google'
+import type { CalEvent } from '@/types'
 import { CalendarGrid } from './adapter/CalendarGrid'
 import { shiftAnchor, visibleRange } from './calendarView'
 import { CalendarPicker } from './CalendarPicker'
@@ -105,6 +109,9 @@ export function CalendarPage() {
   // Skapa händelse: ett klick eller en dragning i rutnätet (eller knappen) ger ett utkast och öppnar popovern.
   const createEvent = useCreateEvent(timeZone)
   const updateEventTime = useUpdateEventTime(timeZone)
+  const updateEvent = useUpdateEvent(timeZone)
+  // Händelsen som visas i redigeringspanelen, som den såg ut när man klickade på den.
+  const [editing, setEditing] = useState<CalEvent | null>(null)
   const gridArea = useRef<HTMLDivElement>(null)
   const draftAnchor = useDraftAnchor(gridArea)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -160,6 +167,24 @@ export function CalendarPage() {
     createEvent(input)
     setDraft(null)
   }
+
+  const events = eventsResult.events
+  const openEvent = useCallback(
+    (ref: { calendarId: string; eventId: string }) => {
+      const found = events.find((e) => e.calendarId === ref.calendarId && e.id === ref.eventId)
+      if (found === undefined) return
+      setDraft(null)
+      setEditing(found)
+    },
+    [events],
+  )
+  let readOnlyReason: EventReadOnlyReason | undefined
+  if (editing?.recurringEventId !== undefined) readOnlyReason = 'recurring'
+  else if (editing !== null && !editableCalendarIds.has(editing.calendarId))
+    readOnlyReason = 'calendar'
+  const closeEditing = useCallback(() => {
+    setEditing(null)
+  }, [])
 
   const gridDraft = useMemo(
     () =>
@@ -325,6 +350,7 @@ export function CalendarPage() {
               onDraftElement={draftAnchor.setElement}
               editableCalendarIds={editableCalendarIds}
               onEventTimeChange={updateEventTime}
+              onEventClick={openEvent}
               {...(defaultCalendarId !== undefined && { onSelectTime: startDraft })}
             />
           </div>
@@ -341,6 +367,19 @@ export function CalendarPage() {
           onChange={handleDraftChange}
           onSubmit={submitDraft}
           onCancel={cancelDraft}
+        />
+      )}
+      {editing !== null && (
+        <EventEditPanel
+          key={`${editing.calendarId}/${editing.id}`}
+          event={editing}
+          calendar={allCalendars.find((c) => c.id === editing.calendarId)}
+          timeZone={timeZone}
+          {...(readOnlyReason !== undefined && { readOnlyReason })}
+          onSave={(edit) => {
+            updateEvent({ calendarId: editing.calendarId, eventId: editing.id, edit })
+          }}
+          onClose={closeEditing}
         />
       )}
     </div>

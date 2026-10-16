@@ -1,3 +1,5 @@
+import type { Reminder } from './event'
+
 export type CalendarAccessRole = 'freeBusyReader' | 'reader' | 'writer' | 'owner'
 
 /**
@@ -14,4 +16,6 @@ export interface CalendarInfo {
   primary: boolean
   accessRole: CalendarAccessRole
   timeZone?: string
+  /** Påminnelser som händelser får om de inte har egna (Googles `defaultReminders`). */
+  defaultReminders?: Reminder[]
 }

@@ -319,3 +319,86 @@ describe('mapGoogleEvent', () => {
     expect(mapGoogleEvent({ id: 'x', etag: '"1"', status: 'cancelled' }, ctx)).toBeNull()
   })
 })
+
+describe('beskrivning och påminnelser', () => {
+  it('mappar beskrivning och egna påminnelser, och släpper metoder appen inte hanterar', () => {
+    const [event] = parseEventsPage(
+      {
+        items: [
+          {
+            ...timedEvent,
+            description: 'Ta med laptop',
+            reminders: {
+              useDefault: false,
+              overrides: [
+                { method: 'popup', minutes: 10 },
+                { method: 'sms', minutes: 30 },
+                { method: 'email', minutes: 1440 },
+              ],
+            },
+          },
+        ],
+      },
+      ctx,
+    ).events
+    expect(event?.description).toBe('Ta med laptop')
+    expect(event?.reminders).toEqual({
+      useDefault: false,
+      overrides: [
+        { method: 'popup', minutes: 10 },
+        { method: 'email', minutes: 1440 },
+      ],
+    })
+  })
+
+  it('mappar useDefault: true utan att läsa med några egna påminnelser', () => {
+    const [event] = parseEventsPage(
+      {
+        items: [
+          {
+            ...timedEvent,
+            reminders: { useDefault: true, overrides: [{ method: 'popup', minutes: 5 }] },
+          },
+        ],
+      },
+      ctx,
+    ).events
+    expect(event?.reminders).toEqual({ useDefault: true })
+  })
+
+  it('tolkar reminders utan useDefault och utan lista som inga påminnelser', () => {
+    const [event] = parseEventsPage({ items: [{ ...timedEvent, reminders: {} }] }, ctx).events
+    expect(event?.reminders).toEqual({ useDefault: false, overrides: [] })
+  })
+
+  it('lämnar fälten tomma när Google inte skickar dem, och en tom beskrivning räknas som ingen', () => {
+    const [event] = parseEventsPage({ items: [{ ...timedEvent, description: '' }] }, ctx).events
+    expect(event).not.toHaveProperty('reminders')
+    expect(event).not.toHaveProperty('description')
+  })
+
+  it('läser kalenderns standardpåminnelser', () => {
+    const [calendar] = parseCalendarListPage({
+      items: [
+        {
+          id: 'a',
+          summary: 'Jobb',
+          backgroundColor: '#16a765',
+          accessRole: 'owner',
+          defaultReminders: [
+            { method: 'popup', minutes: 10 },
+            { method: 'sms', minutes: 5 },
+          ],
+        },
+      ],
+    }).calendars
+    expect(calendar?.defaultReminders).toEqual([{ method: 'popup', minutes: 10 }])
+  })
+
+  it('utelämnar defaultReminders när Google inte skickar dem', () => {
+    const [calendar] = parseCalendarListPage({
+      items: [{ id: 'a', summary: 'Jobb', backgroundColor: '#16a765', accessRole: 'owner' }],
+    }).calendars
+    expect(calendar).not.toHaveProperty('defaultReminders')
+  })
+})

@@ -1,4 +1,4 @@
-import type { CalEvent } from '@/types'
+import type { CalEvent, EventReminders } from '@/types'
 import type { GoogleClient, RequestOptions } from './client'
 import { GoogleApiError } from './errors'
 import { mapGoogleEvent } from './mappers'
@@ -15,7 +15,7 @@ import { googleEventSchema } from './types'
 
 /** Fält i svaret som vi använder. Samma som i `listEvents`, men för en enskild händelse. */
 const EVENT_RESOURCE_FIELDS =
-  'id,etag,status,summary,location,start,end,recurringEventId,extendedProperties/private'
+  'id,etag,status,summary,location,description,reminders,start,end,recurringEventId,extendedProperties/private'
 
 export interface EventRef {
   calendarId: string
@@ -49,6 +49,9 @@ export interface EventChanges {
   /** Start, slut och heldag ändras alltid tillsammans, så att en händelse aldrig blir halvt heldag. */
   time?: EventTime
   location?: string | null
+  description?: string | null
+  /** Hela påminnelselistan ersätts. `{ useDefault: true }` ger kalenderns standardpåminnelser. */
+  reminders?: EventReminders
   familyId?: string | null
   important?: boolean
 }
@@ -176,6 +179,8 @@ export async function patchEvent(
   const body = {
     ...(changes.title !== undefined && { summary: changes.title }),
     ...(changes.location !== undefined && { location: changes.location }),
+    ...(changes.description !== undefined && { description: changes.description }),
+    ...(changes.reminders !== undefined && { reminders: changes.reminders }),
     ...(changes.time !== undefined && timeFields(changes.time, 'patch')),
     ...(Object.keys(privateProps).length > 0 && { extendedProperties: { private: privateProps } }),
   }

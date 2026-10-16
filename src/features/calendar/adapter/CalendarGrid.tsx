@@ -2,6 +2,7 @@ import type {
   CalendarOptions,
   DateSelectArg,
   DatesSetArg,
+  EventClickArg,
   EventDropArg,
   EventMountArg,
 } from '@fullcalendar/core'
@@ -144,6 +145,8 @@ export interface CalendarGridProps {
    * (optimistiskt) av den som tar emot den, och rutnätet ritas om från de nya händelserna.
    */
   onEventTimeChange?: (request: UpdateEventTimeRequest) => void
+  /** Användaren klickade på (eller valde med tangentbordet) en händelse. Utkastet räknas inte. */
+  onEventClick?: (ref: { calendarId: string; eventId: string }) => void
 }
 
 /**
@@ -168,6 +171,7 @@ export function CalendarGrid({
   untitledLabel = '',
   editableCalendarIds,
   onEventTimeChange,
+  onEventClick,
 }: CalendarGridProps) {
   const calendarRef = useRef<FullCalendar>(null)
   const calendarEvents = useMemo(() => {
@@ -215,6 +219,14 @@ export function CalendarGrid({
       if (arg.event.id === DRAFT_EVENT_ID) onDraftElement?.(arg.el)
     },
     [onDraftElement],
+  )
+
+  const handleEventClick = useCallback(
+    (arg: EventClickArg) => {
+      const props = eventPropsSchema.safeParse(arg.event.extendedProps)
+      if (props.success) onEventClick?.(props.data)
+    },
+    [onEventClick],
   )
 
   // Flytta och ändra längd. Esc under dragningen kastar ändringen (se useDragCancel).
@@ -290,6 +302,7 @@ export function CalendarGrid({
         snapDuration={SNAP_DURATION}
         select={handleSelect}
         dateClick={handleDateClick}
+        eventClick={handleEventClick}
         eventDidMount={handleEventDidMount}
         eventInteractive
         nowIndicator

@@ -137,15 +137,58 @@
         "dialog": "New event",
         "title": "Title",
         "titlePlaceholder": "Add title",
-        "allDay": "All day",
-        "startDate": "Start date",
-        "startTime": "Start time",
-        "endDate": "End date",
-        "endTime": "End time",
         "calendar": "Calendar",
-        "invalidTime": "Check the dates and times: the end must be after the start.",
         "save": "Save",
         "cancel": "Cancel"
+      }
+    },
+    "fields": {
+      "allDay": "All day",
+      "startDate": "Start date",
+      "startTime": "Start time",
+      "endDate": "End date",
+      "endTime": "End time",
+      "invalidTime": "Check the dates and times: the end must be after the start."
+    },
+    "edit": {
+      "label": "Edit {{title}}",
+      "dialog": "Edit event",
+      "viewDialog": "Event",
+      "intro": "Change the details of the event.",
+      "title": "Title",
+      "titlePlaceholder": "Add title",
+      "location": "Location",
+      "notes": "Description",
+      "calendar": "Calendar",
+      "save": "Save",
+      "cancel": "Cancel",
+      "close": "Close",
+      "readOnly": {
+        "calendar": "You only have read access to this calendar, so the event can't be changed.",
+        "recurring": "Recurring events can't be changed yet."
+      }
+    },
+    "reminder": {
+      "heading": "Reminders",
+      "useDefault": "Use the calendar's default",
+      "defaultNone": "The calendar has no default reminders.",
+      "none": "No reminders.",
+      "add": "Add reminder",
+      "remove": "Remove reminder {{index}}",
+      "time": "Time before start, reminder {{index}}",
+      "method": "Method, reminder {{index}}",
+      "methods": {
+        "popup": "Notification",
+        "email": "Email"
+      },
+      "before": {
+        "atStart": "At start",
+        "minutes_one": "{{count}} minute before",
+        "minutes_other": "{{count}} minutes before",
+        "hours_one": "{{count}} hour before",
+        "hours_other": "{{count}} hours before",
+        "days_one": "{{count}} day before",
+        "days_other": "{{count}} days before"
       }
     }
   }
