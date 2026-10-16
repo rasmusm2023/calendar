@@ -1,6 +1,11 @@
 {
   "app": {
     "name": "Spaces Calendar",
+    "crash": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred. Your calendars and events are unchanged. Reload the page to continue.",
+      "reload": "Reload"
+    },
     "configError": {
       "title": "The app is not configured",
       "hint": "Copy .env.example to .env.local and fill in the values, or start against the emulators with npm run dev:emulator."
@@ -42,8 +47,13 @@
     "loadError": {
       "title": "Could not load your calendars",
       "network": "Check your internet connection and try again.",
+      "unavailable": "Could not reach Google or the server right now. Try again in a moment.",
       "rateLimited": "Google has temporarily limited the number of requests. Wait a moment and try again.",
       "generic": "Something went wrong while loading the calendars. Try again."
+    },
+    "stale": {
+      "title": "Could not update",
+      "description": "What you see is what was last fetched and may be out of date."
     },
     "eventsError": {
       "title": "Some calendars could not be loaded",

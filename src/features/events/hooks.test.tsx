@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { weekRange } from '@/lib/dates'
 import { GoogleAccessError, GoogleApiError } from '@/lib/google'
@@ -172,5 +172,29 @@ describe('useEventsForCalendars', () => {
     const before = result.current
     rerender()
     expect(result.current).toBe(before)
+  })
+
+  it('skiljer misslyckad uppdatering från misslyckad första hämtning', async () => {
+    let failing = false
+    const { Wrapper, queryClient } = setupFakeGoogleClient(() => {
+      if (failing) throw new GoogleApiError('network', 0)
+      return { items: [eventItem('from-a')] }
+    })
+    const { result } = renderHook(
+      () => useEventsForCalendars({ calendars: [{ id: 'a' }], range: WEEK, timeZone: TZ }),
+      { wrapper: Wrapper },
+    )
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false)
+    })
+
+    failing = true
+    await act(() => queryClient.invalidateQueries())
+
+    await waitFor(() => {
+      expect(result.current.refreshFailures).toHaveLength(1)
+    })
+    expect(result.current.failures).toEqual([])
+    expect(result.current.events.map((e) => e.id)).toEqual(['from-a'])
   })
 })

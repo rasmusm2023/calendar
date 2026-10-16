@@ -26,8 +26,10 @@ export interface EventsForCalendars {
   /** Händelser från de kalendrar som hunnit hämtas, i kalendrarnas ordning. */
   events: CalEvent[]
   issues: (ParseIssue & { calendarId: string })[]
-  /** Kalendrar som inte gick att hämta. De övriga visas ändå. */
+  /** Kalendrar som inte gick att hämta alls. De övriga visas ändå. */
   failures: CalendarFailure[]
+  /** Kalendrar som redan har data men vars senaste uppdatering misslyckades. Datan visas, men kan vara gammal. */
+  refreshFailures: CalendarFailure[]
   truncatedCalendarIds: string[]
   /** Problem med själva åtkomsten (t.ex. återkallad). Drabbar alla kalendrar. */
   accessError: GoogleAccessError | null
@@ -67,6 +69,7 @@ export function useEventsForCalendars({
         events: [],
         issues: [],
         failures: [],
+        refreshFailures: [],
         truncatedCalendarIds: [],
         accessError: null,
         isPending: results.some((result) => result.isPending),
@@ -88,7 +91,9 @@ export function useEventsForCalendars({
           if (result.data.truncated) merged.truncatedCalendarIds.push(calendarId)
         }
         if (result.error instanceof GoogleApiError) {
-          merged.failures.push({ calendarId, error: result.error })
+          const failure = { calendarId, error: result.error }
+          if (result.data) merged.refreshFailures.push(failure)
+          else merged.failures.push(failure)
         } else if (result.error instanceof GoogleAccessError) {
           merged.accessError ??= result.error
         }

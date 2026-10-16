@@ -5,19 +5,26 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCalendars, useEventsForCalendars, type StyleContext } from '@/features/events'
 import { getBrowserTimeZone, shiftWeekRange, weekRange } from '@/lib/dates'
-import { GoogleApiError } from '@/lib/google'
+import { GoogleAccessError, GoogleApiError } from '@/lib/google'
 import { WeekCalendar } from './adapter/WeekCalendar'
 import { CalendarPicker } from './CalendarPicker'
 import { useCalendarSelection } from './useCalendarSelection'
 import { WeekToolbar } from './WeekToolbar'
 import { formatWeekSpan, weekNumber } from './weekTitle'
 
-type LoadErrorKey = 'network' | 'rateLimited' | 'generic'
+type LoadErrorKey = 'network' | 'unavailable' | 'rateLimited' | 'generic'
 
+/**
+ * Vilket meddelande som passar felet. Återkallad åtkomst hanteras inte här: GoogleAccessProvider tar emot
+ * den och visar "Koppla om" i stället för veckovyn.
+ */
 function loadErrorKey(error: unknown): LoadErrorKey {
   if (error instanceof GoogleApiError) {
     if (error.kind === 'network') return 'network'
     if (error.kind === 'rateLimited' || error.kind === 'quotaExceeded') return 'rateLimited'
+  }
+  if (error instanceof GoogleAccessError && error.reason === 'google_unavailable') {
+    return 'unavailable'
   }
   return 'generic'
 }
@@ -42,11 +49,13 @@ export function WeekPage() {
     [visibleCalendars],
   )
 
+  // Har vi en kalenderlista, även om den senaste uppdateringen misslyckades, visas den och dess händelser.
+  const hasCalendars = calendarsQuery.data !== undefined
   const week = useEventsForCalendars({
     calendars: visibleCalendars,
     range,
     timeZone,
-    enabled: calendarsQuery.isSuccess,
+    enabled: hasCalendars,
   })
 
   const goToWeek = (weeks: number) => {
@@ -70,7 +79,7 @@ export function WeekPage() {
     />
   )
 
-  if (calendarsQuery.isPending) {
+  if (!hasCalendars && calendarsQuery.isPending) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {toolbar}
@@ -87,34 +96,39 @@ export function WeekPage() {
     )
   }
 
-  if (calendarsQuery.isError) {
+  if (!hasCalendars) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {toolbar}
         <div className="p-4">
-          <Alert variant="destructive" role="alert" data-testid="calendar-load-error">
-            <AlertTitle>{t('calendar.loadError.title')}</AlertTitle>
-            <AlertDescription>
-              <p>{t(`calendar.loadError.${loadErrorKey(calendarsQuery.error)}`)}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => {
-                  void calendarsQuery.refetch()
-                }}
-              >
-                {t('common.retry')}
-              </Button>
-            </AlertDescription>
-          </Alert>
+          <LoadErrorAlert
+            testId="calendar-load-error"
+            errorKey={loadErrorKey(calendarsQuery.error)}
+            onRetry={() => {
+              void calendarsQuery.refetch()
+            }}
+          />
         </div>
       </div>
     )
   }
 
+  // Något gick inte att uppdatera, men det som hämtades tidigare visas fortfarande.
+  const staleRefresh = calendarsQuery.isError || week.refreshFailures.length > 0
+  const retryAll = () => {
+    void calendarsQuery.refetch()
+    week.refetch()
+  }
+
   const notices = (
     <>
+      {week.accessError && (
+        <LoadErrorAlert
+          testId="calendar-access-error"
+          errorKey={loadErrorKey(week.accessError)}
+          onRetry={week.refetch}
+        />
+      )}
       {week.failures.length > 0 && (
         <Alert variant="destructive" role="alert" data-testid="calendar-events-error">
           <AlertTitle>{t('calendar.eventsError.title')}</AlertTitle>
@@ -126,6 +140,17 @@ export function WeekPage() {
               })}
             </p>
             <Button variant="outline" size="sm" className="mt-2" onClick={week.refetch}>
+              {t('common.retry')}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      {staleRefresh && (
+        <Alert role="status" data-testid="calendar-stale">
+          <AlertTitle>{t('calendar.stale.title')}</AlertTitle>
+          <AlertDescription>
+            <p>{t('calendar.stale.description')}</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={retryAll}>
               {t('common.retry')}
             </Button>
           </AlertDescription>
@@ -178,5 +203,27 @@ export function WeekPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+interface LoadErrorAlertProps {
+  testId: string
+  errorKey: LoadErrorKey
+  onRetry: () => void
+}
+
+function LoadErrorAlert({ testId, errorKey, onRetry }: LoadErrorAlertProps) {
+  const { t } = useTranslation()
+
+  return (
+    <Alert variant="destructive" role="alert" data-testid={testId}>
+      <AlertTitle>{t('calendar.loadError.title')}</AlertTitle>
+      <AlertDescription>
+        <p>{t(`calendar.loadError.${errorKey}`)}</p>
+        <Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
+          {t('common.retry')}
+        </Button>
+      </AlertDescription>
+    </Alert>
   )
 }

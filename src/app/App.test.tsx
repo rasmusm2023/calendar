@@ -6,6 +6,7 @@ import { AuthProvider } from '@/features/auth'
 import { GoogleAccessProvider } from '@/features/google-access'
 import { createI18n } from '@/i18n'
 import { createFakeAuthService, TEST_USER, type InitialAuth } from '@/test/fakeAuthService'
+import { TEST_CALENDAR_COLOR } from '@/test/fixtures'
 import { createFakeGoogleAccessService } from '@/test/fakeGoogleAccessService'
 import { App } from './App'
 import { QueryProvider } from './QueryProvider'
@@ -59,6 +60,63 @@ describe('App', () => {
   })
 })
 
+describe('App när åtkomsten återkallas under tiden', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('byter till "Koppla om" och visar händelserna igen efter ny koppling', async () => {
+    let revoked = true
+    const start = new Date()
+    const end = new Date(start.getTime() + 60 * 60 * 1000)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request) => {
+        const url = String(input instanceof Request ? input.url : input)
+        if (url.includes('/calendarList')) {
+          return Promise.resolve(
+            Response.json({
+              items: [
+                {
+                  id: 'a',
+                  summary: 'A',
+                  accessRole: 'owner',
+                  backgroundColor: TEST_CALENDAR_COLOR,
+                  selected: true,
+                },
+              ],
+            }),
+          )
+        }
+        if (revoked) return Promise.resolve(new Response('{}', { status: 401 }))
+        return Promise.resolve(
+          Response.json({
+            items: [
+              {
+                id: 'e1',
+                etag: '"1"',
+                summary: 'Planeringsmöte',
+                start: { dateTime: start.toISOString() },
+                end: { dateTime: end.toISOString() },
+              },
+            ],
+          }),
+        )
+      }),
+    )
+    const { user } = await renderApp(TEST_USER)
+
+    // Googles svar på händelseanropet (401 två gånger) betyder att åtkomsten är återkallad.
+    const reconnect = await screen.findByRole('button', { name: 'Koppla om' })
+    expect(screen.queryByTestId('app-root')).not.toBeInTheDocument()
+
+    revoked = false
+    await user.click(reconnect)
+
+    expect(await screen.findByText('Planeringsmöte')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Koppla om' })).not.toBeInTheDocument()
+  })
+})
 describe('ConfigErrorScreen', () => {
   it('visar rubrik, tips och teknisk detalj som en alert', async () => {
     const i18n = await createI18n('sv')

@@ -1,6 +1,11 @@
 {
   "app": {
     "name": "Spaces Calendar",
+    "crash": {
+      "title": "Något gick fel",
+      "description": "Ett oväntat fel inträffade. Dina kalendrar och händelser är oförändrade. Ladda om sidan för att fortsätta.",
+      "reload": "Ladda om"
+    },
     "configError": {
       "title": "Appen är inte konfigurerad",
       "hint": "Kopiera .env.example till .env.local och fyll i värdena, eller starta mot emulatorer med npm run dev:emulator."
@@ -42,8 +47,13 @@
     "loadError": {
       "title": "Det gick inte att hämta dina kalendrar",
       "network": "Kontrollera din internetanslutning och försök igen.",
+      "unavailable": "Det gick inte att nå Google eller servern just nu. Försök igen om en stund.",
       "rateLimited": "Google har tillfälligt begränsat antalet anrop. Vänta en stund och försök igen.",
       "generic": "Något gick fel när kalendrarna skulle hämtas. Försök igen."
+    },
+    "stale": {
+      "title": "Kunde inte uppdatera",
+      "description": "Det du ser är det som hämtades senast och kan vara inaktuellt."
     },
     "eventsError": {
       "title": "Vissa kalendrar kunde inte hämtas",

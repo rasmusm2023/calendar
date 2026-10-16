@@ -1,10 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '@/features/auth'
 import { createI18n } from '@/i18n'
-import { GoogleApiError, type QueryParams } from '@/lib/google'
+import { GoogleAccessError, GoogleApiError, type QueryParams } from '@/lib/google'
 import { createFakeAuthService, TEST_USER, type InitialAuth } from '@/test/fakeAuthService'
 import { setupFakeGoogleClient, type Responder } from '@/test/fakeGoogleClient'
 import { TEST_CALENDAR_COLOR } from '@/test/fixtures'
@@ -281,6 +281,71 @@ describe('WeekPage', () => {
       await screen.findByText('Händelse from-a')
 
       expect(screen.getByRole('group', { name: 'Kalendrar' })).toBeInTheDocument()
+    })
+  })
+
+  describe('fellägen', () => {
+    it('visar att Google eller servern inte svarar när åtkomstkontrollen är otillgänglig', async () => {
+      await renderPage({
+        responder: () => {
+          throw new GoogleAccessError('google_unavailable')
+        },
+      })
+
+      const alert = await screen.findByTestId('calendar-load-error')
+      expect(alert).toHaveTextContent('Det gick inte att nå Google eller servern')
+    })
+
+    it('ber om att få försöka igen vid begränsning hos Google', async () => {
+      await renderPage({
+        responder: () => {
+          throw new GoogleApiError('rateLimited', 429)
+        },
+      })
+
+      expect(await screen.findByTestId('calendar-load-error')).toHaveTextContent(
+        'Google har tillfälligt begränsat',
+      )
+    })
+
+    it('visar ett fel i stället för en tom vecka när händelserna inte går att hämta på grund av åtkomst', async () => {
+      await renderPage({
+        events: () => {
+          throw new GoogleAccessError('unknown')
+        },
+      })
+
+      expect(await screen.findByTestId('calendar-access-error')).toBeInTheDocument()
+    })
+
+    it('behåller det som visas och varnar när en uppdatering misslyckas', async () => {
+      let failing = false
+      const { queryClient, user } = await renderPage({
+        responder: (path) => {
+          if (failing) throw new GoogleApiError('network', 0)
+          return path === '/users/me/calendarList'
+            ? { items: [calendarEntry('a', { selected: true })] }
+            : { items: [eventItem('from-a')] }
+        },
+      })
+      await screen.findByText('Händelse from-a')
+
+      failing = true
+      await act(() => queryClient.invalidateQueries())
+
+      const stale = await screen.findByTestId('calendar-stale')
+      expect(stale).toHaveTextContent('Kunde inte uppdatera')
+      // Datan försvinner inte och vyn byts inte mot en felskärm.
+      expect(screen.getByText('Händelse from-a')).toBeInTheDocument()
+      expect(screen.queryByTestId('calendar-load-error')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('calendar-events-error')).not.toBeInTheDocument()
+
+      failing = false
+      await user.click(within(stale).getByRole('button', { name: 'Försök igen' }))
+      await waitFor(() => {
+        expect(screen.queryByTestId('calendar-stale')).not.toBeInTheDocument()
+      })
+      expect(screen.getByText('Händelse from-a')).toBeInTheDocument()
     })
   })
 })
