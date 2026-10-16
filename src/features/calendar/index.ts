@@ -1,1 +1,1 @@
-export { WeekPage } from './WeekPage'
+export { CalendarPage } from './CalendarPage'

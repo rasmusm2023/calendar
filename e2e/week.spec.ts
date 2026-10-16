@@ -150,3 +150,73 @@ test('hämtar bara veckan som visas', async ({ page }) => {
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000
   expect(Math.abs(span - WEEK_MS)).toBeLessThanOrEqual(60 * 60 * 1000)
 })
+
+test('byt mellan dag, N dagar, månad och schema, och vyn finns kvar efter omladdning', async ({
+  page,
+}) => {
+  const api = await openWeek(page)
+  await expect(event(page, 'Planering')).toBeVisible()
+  const views = page.getByRole('group', { name: 'Vy' })
+  const columns = page.locator('.fc-col-header-cell')
+  await expect(columns).toHaveCount(7)
+
+  // Dag: bara idag.
+  await views.getByRole('button', { name: 'Dag', exact: true }).click()
+  await expect(columns).toHaveCount(1)
+  await expect(event(page, 'Planering')).toBeVisible()
+  await expect(event(page, 'Veckomöte')).toHaveCount(0)
+
+  // N dagar: antalet går att ändra.
+  await views.getByRole('button', { name: '3 dagar', exact: true }).click()
+  await expect(columns).toHaveCount(3)
+  await page.getByRole('combobox', { name: 'Antal dagar' }).selectOption('5')
+  await expect(columns).toHaveCount(5)
+
+  // Schema: lista över 30 dygn, här syns även nästa veckas möte.
+  await views.getByRole('button', { name: 'Schema', exact: true }).click()
+  await expect(page.locator('.fc-list')).toBeVisible()
+  await expect(event(page, 'Planering')).toBeVisible()
+  await expect(event(page, 'Veckomöte')).toBeVisible()
+
+  // Månad: tidsbestämda händelser är fyllda block i kalenderns färg, och det hämtas hela veckor.
+  await views.getByRole('button', { name: 'Månad', exact: true }).click()
+  await expect(page.locator('.fc-dayGridMonth-view')).toBeVisible()
+  await expect(event(page, 'Planering')).toBeVisible()
+  await expect(page.locator('.fc-daygrid-block-event', { hasText: 'Planering' })).toHaveCSS(
+    'background-color',
+    'rgb(225, 29, 72)',
+  )
+  const monthRequest = api.eventRequests.at(-1)
+  const monthSpanDays =
+    (Date.parse(monthRequest?.timeMax ?? '') - Date.parse(monthRequest?.timeMin ?? '')) /
+    (24 * 60 * 60 * 1000)
+  expect(monthSpanDays).toBeGreaterThanOrEqual(28)
+  expect(monthSpanDays).toBeLessThanOrEqual(42)
+
+  // Bläddra en månad framåt och tillbaka med Idag.
+  await page.getByRole('button', { name: 'Nästa månad' }).click()
+  await expect(event(page, 'Planering')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Idag' }).click()
+  await expect(event(page, 'Planering')).toBeVisible()
+
+  // Vyn minns man efter omladdning.
+  await page.reload()
+  await expect(page.getByTestId('app-root')).toBeVisible()
+  await expect(views.getByRole('button', { name: 'Månad', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(event(page, 'Planering')).toBeVisible()
+})
+
+test('veckovyn scrollar till aktuell tid och visar nu-linjen', async ({ page }) => {
+  // Lågt fönster och sen kvällstid: utan scroll hamnar nu-linjen långt under det som syns (rutnätet
+  // börjar på förmiddagen), så den syns bara om kalendern faktiskt scrollat till aktuell tid.
+  await page.setViewportSize({ width: 1280, height: 600 })
+  await page.clock.setFixedTime(new Date(zonedTime(0, '22:30')))
+  await openWeek(page)
+
+  const nowLine = page.locator('.fc-timegrid-now-indicator-line')
+  await expect(nowLine).toBeAttached()
+  await expect(nowLine).toBeInViewport()
+})

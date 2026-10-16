@@ -41,13 +41,34 @@
     "signOut": "Sign out"
   },
   "calendar": {
-    "label": "Week calendar",
+    "label": "Calendar",
     "weekNumber": "w{{number}}",
     "toolbar": {
-      "label": "Week navigation",
-      "previous": "Previous week",
-      "next": "Next week",
+      "label": "Calendar navigation",
+      "previous": {
+        "day": "Previous day",
+        "week": "Previous week",
+        "days": "Previous period",
+        "month": "Previous month",
+        "agenda": "Previous period"
+      },
+      "next": {
+        "day": "Next day",
+        "week": "Next week",
+        "days": "Next period",
+        "month": "Next month",
+        "agenda": "Next period"
+      },
       "today": "Today"
+    },
+    "view": {
+      "label": "View",
+      "day": "Day",
+      "week": "Week",
+      "days": "{{days}} days",
+      "month": "Month",
+      "agenda": "Schedule",
+      "daysCount": "Number of days"
     },
     "refreshing": "Updating…",
     "noCalendars": "You have no calendars to show.",

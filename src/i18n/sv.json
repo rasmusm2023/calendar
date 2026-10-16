@@ -41,13 +41,34 @@
     "signOut": "Logga ut"
   },
   "calendar": {
-    "label": "Veckokalender",
+    "label": "Kalender",
     "weekNumber": "v{{number}}",
     "toolbar": {
-      "label": "Veckonavigering",
-      "previous": "Föregående vecka",
-      "next": "Nästa vecka",
+      "label": "Kalendernavigering",
+      "previous": {
+        "day": "Föregående dag",
+        "week": "Föregående vecka",
+        "days": "Föregående period",
+        "month": "Föregående månad",
+        "agenda": "Föregående period"
+      },
+      "next": {
+        "day": "Nästa dag",
+        "week": "Nästa vecka",
+        "days": "Nästa period",
+        "month": "Nästa månad",
+        "agenda": "Nästa period"
+      },
       "today": "Idag"
+    },
+    "view": {
+      "label": "Vy",
+      "day": "Dag",
+      "week": "Vecka",
+      "days": "{{days}} dagar",
+      "month": "Månad",
+      "agenda": "Schema",
+      "daysCount": "Antal dagar"
     },
     "refreshing": "Uppdaterar…",
     "noCalendars": "Du har inga kalendrar att visa.",

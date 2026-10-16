@@ -4,13 +4,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCalendars, useEventsForCalendars, type StyleContext } from '@/features/events'
-import { getBrowserTimeZone, shiftWeekRange, weekRange } from '@/lib/dates'
+import { getBrowserTimeZone } from '@/lib/dates'
 import { GoogleAccessError, GoogleApiError } from '@/lib/google'
-import { WeekCalendar } from './adapter/WeekCalendar'
+import { CalendarGrid } from './adapter/CalendarGrid'
+import { shiftAnchor, visibleRange } from './calendarView'
 import { CalendarPicker } from './CalendarPicker'
+import { CalendarToolbar } from './CalendarToolbar'
 import { useCalendarSelection } from './useCalendarSelection'
-import { WeekToolbar } from './WeekToolbar'
-import { formatWeekSpan, weekNumber } from './weekTitle'
+import { useCalendarView } from './useCalendarView'
+import { formatViewTitle, viewWeekNumber } from './viewTitle'
 
 type LoadErrorKey = 'network' | 'unavailable' | 'rateLimited' | 'generic'
 
@@ -29,14 +31,15 @@ function loadErrorKey(error: unknown): LoadErrorKey {
   return 'generic'
 }
 
-/** Veckovyn: kalenderlista, händelser för veckan och navigering mellan veckor. Skrivskyddad i Fas 0. */
-export function WeekPage() {
+/** Kalendersidan: kalenderlista, vyer (dag, vecka, N dagar, månad, schema), händelser och navigering. */
+export function CalendarPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n.language.startsWith('sv') ? 'sv' : 'en'
   const timeZone = useMemo(() => getBrowserTimeZone(), [])
 
+  const { view, setKind, setDays } = useCalendarView()
   const [anchor, setAnchor] = useState(() => new Date())
-  const range = useMemo(() => weekRange(anchor, timeZone), [anchor, timeZone])
+  const range = useMemo(() => visibleRange(view, anchor, timeZone), [view, anchor, timeZone])
 
   const calendarsQuery = useCalendars()
   const allCalendars = useMemo(() => calendarsQuery.data?.calendars ?? [], [calendarsQuery.data])
@@ -51,27 +54,32 @@ export function WeekPage() {
 
   // Har vi en kalenderlista, även om den senaste uppdateringen misslyckades, visas den och dess händelser.
   const hasCalendars = calendarsQuery.data !== undefined
-  const week = useEventsForCalendars({
+  const eventsResult = useEventsForCalendars({
     calendars: visibleCalendars,
     range,
     timeZone,
     enabled: hasCalendars,
   })
 
-  const goToWeek = (weeks: number) => {
-    setAnchor(shiftWeekRange(range, weeks, timeZone).start)
+  const goTo = (direction: -1 | 1) => {
+    setAnchor(shiftAnchor(view, anchor, direction, timeZone))
   }
 
   const toolbar = (
-    <WeekToolbar
-      span={formatWeekSpan(range, timeZone, locale)}
-      weekNumber={weekNumber(range)}
-      isRefreshing={calendarsQuery.isFetching || (week.isFetching && !week.isPending)}
+    <CalendarToolbar
+      title={formatViewTitle({ view, range, anchor, timeZone, locale })}
+      weekNumber={viewWeekNumber(view, range)}
+      view={view}
+      onViewChange={setKind}
+      onDaysChange={setDays}
+      isRefreshing={
+        calendarsQuery.isFetching || (eventsResult.isFetching && !eventsResult.isPending)
+      }
       onPrevious={() => {
-        goToWeek(-1)
+        goTo(-1)
       }}
       onNext={() => {
-        goToWeek(1)
+        goTo(1)
       }}
       onToday={() => {
         setAnchor(new Date())
@@ -114,32 +122,32 @@ export function WeekPage() {
   }
 
   // Något gick inte att uppdatera, men det som hämtades tidigare visas fortfarande.
-  const staleRefresh = calendarsQuery.isError || week.refreshFailures.length > 0
+  const staleRefresh = calendarsQuery.isError || eventsResult.refreshFailures.length > 0
   const retryAll = () => {
     void calendarsQuery.refetch()
-    week.refetch()
+    eventsResult.refetch()
   }
 
   const notices = (
     <>
-      {week.accessError && (
+      {eventsResult.accessError && (
         <LoadErrorAlert
           testId="calendar-access-error"
-          errorKey={loadErrorKey(week.accessError)}
-          onRetry={week.refetch}
+          errorKey={loadErrorKey(eventsResult.accessError)}
+          onRetry={eventsResult.refetch}
         />
       )}
-      {week.failures.length > 0 && (
+      {eventsResult.failures.length > 0 && (
         <Alert variant="destructive" role="alert" data-testid="calendar-events-error">
           <AlertTitle>{t('calendar.eventsError.title')}</AlertTitle>
           <AlertDescription>
             <p>
               {t('calendar.eventsError.description', {
-                failed: week.failures.length,
+                failed: eventsResult.failures.length,
                 total: visibleCalendars.length,
               })}
             </p>
-            <Button variant="outline" size="sm" className="mt-2" onClick={week.refetch}>
+            <Button variant="outline" size="sm" className="mt-2" onClick={eventsResult.refetch}>
               {t('common.retry')}
             </Button>
           </AlertDescription>
@@ -156,7 +164,7 @@ export function WeekPage() {
           </AlertDescription>
         </Alert>
       )}
-      {week.truncatedCalendarIds.length > 0 && (
+      {eventsResult.truncatedCalendarIds.length > 0 && (
         <Alert data-testid="calendar-truncated">
           <AlertDescription>{t('calendar.truncated')}</AlertDescription>
         </Alert>
@@ -192,9 +200,10 @@ export function WeekPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex flex-col gap-2 px-4 pt-2 empty:hidden">{notices}</div>
           <div className="min-h-0 flex-1 p-2">
-            <WeekCalendar
-              events={week.events}
+            <CalendarGrid
+              events={eventsResult.events}
               styleContext={styleContext}
+              view={view}
               date={anchor}
               locale={locale}
               ariaLabel={t('calendar.label')}

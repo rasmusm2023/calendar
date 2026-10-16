@@ -1,5 +1,15 @@
 import { TZDate, tz } from '@date-fns/tz'
-import { addWeeks, formatISO, startOfWeek, type Day } from 'date-fns'
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  endOfMonth,
+  formatISO,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  type Day,
+} from 'date-fns'
 
 /** Veckan börjar på måndag som standard (PRD 6.2). */
 export const DEFAULT_WEEK_STARTS_ON: Day = 1
@@ -52,4 +62,36 @@ export function shiftWeekRange(range: DateRange, weeks: number, timeZone: string
 /** RFC 3339 med tidszonsoffset, t.ex. "2026-10-19T00:00:00+02:00". Används mot Google (timeMin/timeMax). */
 export function toRfc3339(instant: Date, timeZone: string): string {
   return formatISO(inZone(instant, timeZone))
+}
+
+/** days hela dygn från och med dygnet som instant tillhör, som [00:00, 00:00 days dygn senare). */
+export function dayRange(instant: Date | number, timeZone: string, days = 1): DateRange {
+  const start = startOfDay(inZone(instant, timeZone), { in: tz(timeZone) })
+  return { start, end: addDays(start, days, { in: tz(timeZone) }) }
+}
+
+/**
+ * Månadsrutnätet för månaden som instant tillhör: hela veckor från veckan där månaden börjar till och
+ * med veckan där den slutar. Det är exakt det som en månadsvy visar (utan fast antal veckor).
+ */
+export function monthGridRange(
+  instant: Date | number,
+  timeZone: string,
+  weekStartsOn: Day = DEFAULT_WEEK_STARTS_ON,
+): DateRange {
+  const zoned = inZone(instant, timeZone)
+  const options = { in: tz(timeZone) }
+  const start = startOfWeek(startOfMonth(zoned, options), { weekStartsOn, ...options })
+  const lastWeekStart = startOfWeek(endOfMonth(zoned, options), { weekStartsOn, ...options })
+  return { start, end: addWeeks(lastWeekStart, 1, options) }
+}
+
+/** Flyttar ett ögonblick days kalenderdygn (en dag med sommartidsbyte är 23 eller 25 timmar). */
+export function addDaysInZone(instant: Date | number, days: number, timeZone: string): TZDate {
+  return addDays(inZone(instant, timeZone), days, { in: tz(timeZone) })
+}
+
+/** Flyttar ett ögonblick months kalendermånader. Dagen kapas om månaden är kortare (31 jan blir 28 feb). */
+export function addMonthsInZone(instant: Date | number, months: number, timeZone: string): TZDate {
+  return addMonths(inZone(instant, timeZone), months, { in: tz(timeZone) })
 }

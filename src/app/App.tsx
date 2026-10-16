@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { AuthGate, SignOutButton } from '@/features/auth'
-import { WeekPage } from '@/features/calendar'
+import { CalendarPage } from '@/features/calendar'
 import { GoogleAccessGate } from '@/features/google-access'
 
 export function App() {
@@ -19,7 +19,7 @@ export function App() {
             aria-label={t('app.name')}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <WeekPage />
+            <CalendarPage />
           </main>
         </div>
       </GoogleAccessGate>

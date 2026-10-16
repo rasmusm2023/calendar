@@ -8,7 +8,7 @@ import { GoogleAccessError, GoogleApiError, type QueryParams } from '@/lib/googl
 import { createFakeAuthService, TEST_USER, type InitialAuth } from '@/test/fakeAuthService'
 import { setupFakeGoogleClient, type Responder } from '@/test/fakeGoogleClient'
 import { TEST_CALENDAR_COLOR } from '@/test/fixtures'
-import { WeekPage } from './WeekPage'
+import { CalendarPage } from './CalendarPage'
 
 // Onsdag 21 okt 2026 (vecka 43, 19-25 okt).
 const NOW = new Date('2026-10-21T12:00:00Z')
@@ -57,7 +57,7 @@ async function renderPage({
     <I18nextProvider i18n={i18n}>
       <AuthProvider service={authService.service}>
         <fake.Wrapper>
-          <WeekPage />
+          <CalendarPage />
         </fake.Wrapper>
       </AuthProvider>
     </I18nextProvider>,
@@ -69,7 +69,7 @@ function eventCalls(getJson: ReturnType<typeof setupFakeGoogleClient>['getJson']
   return getJson.mock.calls.filter(([path]) => path !== '/users/me/calendarList')
 }
 
-describe('WeekPage', () => {
+describe('CalendarPage', () => {
   beforeEach(() => {
     window.localStorage.clear()
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -85,8 +85,8 @@ describe('WeekPage', () => {
     expect(screen.getByTestId('calendar-loading')).toBeInTheDocument()
     expect(await screen.findByText('Händelse from-a')).toBeInTheDocument()
     expect(screen.queryByTestId('calendar-loading')).not.toBeInTheDocument()
-    expect(screen.getByTestId('week-title')).toHaveTextContent('v43')
-    expect(screen.getByRole('region', { name: 'Veckokalender' })).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-title')).toHaveTextContent('v43')
+    expect(screen.getByRole('region', { name: 'Kalender' })).toBeInTheDocument()
   })
 
   it('hämtar bara kalendrar som är tända i Google', async () => {
@@ -123,7 +123,7 @@ describe('WeekPage', () => {
   it('bläddrar till nästa och föregående vecka och tillbaka med Idag', async () => {
     const { getJson, user } = await renderPage()
     await screen.findByText('Händelse from-a')
-    const title = screen.getByTestId('week-title')
+    const title = screen.getByTestId('calendar-title')
     const thisWeek = title.textContent
 
     await user.click(screen.getByRole('button', { name: 'Nästa vecka' }))
@@ -148,8 +148,163 @@ describe('WeekPage', () => {
     await renderPage()
     await screen.findByText('Händelse from-a')
 
-    const toolbar = screen.getByRole('toolbar', { name: 'Veckonavigering' })
-    expect(within(toolbar).getAllByRole('button')).toHaveLength(3)
+    const toolbar = screen.getByRole('toolbar', { name: 'Kalendernavigering' })
+    // Idag, föregående, nästa och de fem vyerna.
+    expect(within(toolbar).getAllByRole('button')).toHaveLength(8)
+  })
+
+  describe('vyer', () => {
+    const lastRange = (getJson: ReturnType<typeof setupFakeGoogleClient>['getJson']) => {
+      const params = eventCalls(getJson).at(-1)?.[1]
+      return [String(params?.timeMin).slice(0, 10), String(params?.timeMax).slice(0, 10)]
+    }
+
+    async function switchTo(user: ReturnType<typeof userEvent.setup>, name: string) {
+      const group = screen.getByRole('group', { name: 'Vy' })
+      await user.click(within(group).getByRole('button', { name }))
+    }
+
+    it('startar i veckovyn och markerar den som vald', async () => {
+      await renderPage()
+      await screen.findByText('Händelse from-a')
+
+      const group = screen.getByRole('group', { name: 'Vy' })
+      expect(within(group).getByRole('button', { name: 'Vecka' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      expect(within(group).getByRole('button', { name: 'Månad' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      )
+    })
+
+    it('dagvyn hämtar ett dygn, visar datumet och bläddrar en dag i taget', async () => {
+      const { getJson, user } = await renderPage()
+      await screen.findByText('Händelse from-a')
+
+      await switchTo(user, 'Dag')
+
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-21', '2026-10-22'])
+      })
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('onsdag 21 oktober 2026')
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('v43')
+
+      await user.click(screen.getByRole('button', { name: 'Nästa dag' }))
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-22', '2026-10-23'])
+      })
+      await user.click(screen.getByRole('button', { name: 'Föregående dag' }))
+      await user.click(screen.getByRole('button', { name: 'Föregående dag' }))
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-20', '2026-10-21'])
+      })
+    })
+
+    it('månadsvyn hämtar hela veckor och bläddrar en månad i taget', async () => {
+      const { getJson, user } = await renderPage()
+      await screen.findByText('Händelse from-a')
+
+      await switchTo(user, 'Månad')
+
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-09-28', '2026-11-02'])
+      })
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('oktober 2026')
+      expect(screen.getByTestId('calendar-title')).not.toHaveTextContent(/v\d/)
+
+      await user.click(screen.getByRole('button', { name: 'Nästa månad' }))
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-26', '2026-12-07'])
+      })
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('november 2026')
+    })
+
+    it('schemat hämtar 30 dygn från datumet och bläddrar 30 dygn i taget', async () => {
+      const { getJson, user } = await renderPage()
+      await screen.findByText('Händelse from-a')
+
+      await switchTo(user, 'Schema')
+
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-21', '2026-11-20'])
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Nästa period' }))
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-11-20', '2026-12-20'])
+      })
+    })
+
+    it('N dagar hämtar så många dygn som valts och går att ändra', async () => {
+      const { getJson, user } = await renderPage()
+      await screen.findByText('Händelse from-a')
+
+      await switchTo(user, '3 dagar')
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-21', '2026-10-24'])
+      })
+
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Antal dagar' }), '5')
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-21', '2026-10-26'])
+      })
+      expect(screen.getByRole('button', { name: '5 dagar' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Nästa period' }))
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-26', '2026-10-31'])
+      })
+    })
+
+    it('visar antalsväljaren bara när N dagar är vald', async () => {
+      const { user } = await renderPage()
+      await screen.findByText('Händelse from-a')
+      expect(screen.queryByRole('combobox', { name: 'Antal dagar' })).not.toBeInTheDocument()
+
+      await switchTo(user, '3 dagar')
+      expect(screen.getByRole('combobox', { name: 'Antal dagar' })).toBeInTheDocument()
+
+      await switchTo(user, 'Vecka')
+      expect(screen.queryByRole('combobox', { name: 'Antal dagar' })).not.toBeInTheDocument()
+    })
+
+    it('behåller datumet när vyn byts och Idag går tillbaka till idag', async () => {
+      const { getJson, user } = await renderPage()
+      await screen.findByText('Händelse from-a')
+      await user.click(screen.getByRole('button', { name: 'Nästa vecka' }))
+      await user.click(screen.getByRole('button', { name: 'Nästa vecka' }))
+
+      await switchTo(user, 'Dag')
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-11-04', '2026-11-05'])
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Idag' }))
+      await waitFor(() => {
+        expect(lastRange(getJson)).toEqual(['2026-10-21', '2026-10-22'])
+      })
+    })
+
+    it('kommer ihåg vald vy efter omladdning', async () => {
+      const first = await renderPage()
+      await screen.findByText('Händelse from-a')
+      await switchTo(first.user, 'Månad')
+      first.unmount()
+
+      await renderPage()
+      await screen.findByText('Händelse from-a')
+
+      const group = screen.getByRole('group', { name: 'Vy' })
+      expect(within(group).getByRole('button', { name: 'Månad' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+    })
   })
 
   it('visar felmeddelande med "Försök igen" när kalenderlistan inte går att hämta', async () => {
