@@ -39,6 +39,8 @@ export function needsReconnect(reason: GoogleAccessReason): reason is ReconnectR
  * - `quotaExceeded`: dygnskvoten är slut. Det hjälper inte att försöka igen.
  * - `forbidden`: Google nekar just den här åtgärden (annan sak än återkallad åtkomst).
  * - `notFound` och `gone`: kalendern eller händelsen finns inte längre.
+ * - `conflict` (409): ett id som redan används, t.ex. när en skapad händelse skickas igen.
+ * - `preconditionFailed` (412): händelsen har ändrats sedan vi hämtade den (If-Match stämde inte).
  * - `badRequest`: vi skickade något Google inte accepterar. Det är ett fel hos oss.
  * - `server`: Googles servrar svarar med fel, även efter nya försök.
  * - `network`: ingen kontakt med Google, även efter nya försök.
@@ -51,6 +53,8 @@ export type GoogleApiErrorKind =
   | 'forbidden'
   | 'notFound'
   | 'gone'
+  | 'conflict'
+  | 'preconditionFailed'
   | 'badRequest'
   | 'server'
   | 'network'

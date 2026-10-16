@@ -29,7 +29,7 @@ Kvar: Fas 0 är klar (steg 0.1-0.20). Steg 0.20, riktig acceptans mot Google, ve
 Ordning bestämd 2026-10-16: mutationer först (1.1, 1.2, sedan skapa, dra och redigera), vyerna efteråt. IndexedDB-cache skjuts upp till Fas 3.
 
 - [x] 1.1 Ångra-infrastruktur: `UndoManager` i `src/lib/undo/` (kommandon med `forward`/`backward`, köer per händelse, ihopslagning med `coalesce`, rollback, ångra/gör om, max 100) och `UndoProvider`/`useUndo`/toasts i `src/features/undo/` (fel med "Försök igen", "Ångra" för borttagningar, återkallad åtkomst leder till "Koppla om"). Kopplat i `main.tsx`.
-- [ ] 1.2 Skrivande Google-klient (skapa, ändra, ta bort, flytta; `If-Match`/etag, 412).
+- [x] 1.2 Skrivande Google-klient: `requestJson` (POST/PATCH/DELETE med JSON-body och `If-Match`; skrivningar görs inte om efter 5xx eller nätverksfel, bara efter rate limit; tomt svar tillåts för DELETE; skrivningar köar inte bakom läsningar) och `src/lib/google/eventWrites.ts` (`insertEvent` med eget id och 409-hantering, `patchEvent`, `deleteEvent` där 404/410 räknas som lyckat, `moveEvent`, `getEvent`, `generateEventId`). Nya felsorter `conflict` (409) och `preconditionFailed` (412). Inte provat mot riktiga Google ännu, det görs i 1.5 och 1.6.
 - [ ] 1.3 Fler vyer: dag, N dagar, månad, schema, nu-linje.
 - [ ] 1.4 Synk: polling 60 s, fokus, förhämtning.
 - [ ] 1.5 Skapa med klick/drag och snabbpopover.
@@ -47,3 +47,5 @@ Ordning bestämd 2026-10-16: mutationer först (1.1, 1.2, sedan skapa, dra och r
 - PROJECT.md är otydlig om var `settings` ligger (`users/{uid}` eller `users/{uid}/settings/{doc}`). Reglerna tillåter båda.
 - Dubbel frontmatter i `.cursor/rules/project.mdc`.
 - Google Calendar API mockas i E2E med Playwrights page.route i stället för MSW (PROJECT.md nämner MSW). Samma effekt i webbläsaren utan service worker. Föreslå uppdatering av PROJECT.md om du vill behålla det som standard.
+- Skrivande anrop är bara testade mot fejkad fetch. Att kontrollera mot riktiga Google i 1.5/1.6: att webbläsaren får skicka If-Match (CORS), att PATCH med dateTime: null/date: null byter mellan heldag och tidsbestämd, och att extendedProperties.private slås ihop vid PATCH.
+- Flera snabba ändringar på samma händelse: kommandona i 1.6 måste läsa senaste etag ur cachen när anropet skickas, inte när användaren släppte, annars ger andra ändringen 412.

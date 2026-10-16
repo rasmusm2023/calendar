@@ -15,7 +15,11 @@ export function setupFakeGoogleClient(responder: Responder) {
   const getJson = vi.fn((path: string, params: QueryParams = {}) =>
     Promise.resolve().then(() => responder(path, params)),
   )
-  const client: GoogleClient = { getJson: (path, params) => getJson(path, params) }
+  const client: GoogleClient = {
+    getJson: (path, params) => getJson(path, params),
+    requestJson: () =>
+      Promise.reject(new Error('Skrivande anrop är inte fejkade i den här hjälparen')),
+  }
   const queryClient = createQueryClient()
   const value: GoogleAccessContextValue = {
     state: { status: 'connected' },

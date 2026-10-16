@@ -1,6 +1,6 @@
 import { toRfc3339 } from '@/lib/dates'
 import type { CalendarInfo, CalEvent } from '@/types'
-import type { GoogleClient, RequestOptions } from './client'
+import type { GoogleReader, RequestOptions } from './client'
 import { GoogleAccessError, GoogleApiError } from './errors'
 import { parseCalendarListPage, parseEventsPage, type ParseIssue } from './mappers'
 
@@ -22,7 +22,7 @@ export interface CalendarListResult {
 
 /** Alla användarens kalendrar (alla sidor). Färgerna kommer som hex via colorRgbFormat. */
 export async function listCalendars(
-  client: GoogleClient,
+  client: GoogleReader,
   options: RequestOptions = {},
 ): Promise<CalendarListResult> {
   const calendars: CalendarInfo[] = []
@@ -70,7 +70,7 @@ export interface EventsResult {
  * enskilda instanser (singleEvents=true). Vi expanderar aldrig RRULE själva.
  */
 export async function listEvents(
-  client: GoogleClient,
+  client: GoogleReader,
   request: EventsRequest,
   options: RequestOptions = {},
 ): Promise<EventsResult> {
@@ -135,7 +135,7 @@ export interface MultiEventsOptions extends RequestOptions {
  * kastas direkt eftersom de drabbar alla kalendrar.
  */
 export async function listEventsForCalendars(
-  client: GoogleClient,
+  client: GoogleReader,
   request: MultiEventsRequest,
   { concurrency = DEFAULT_CONCURRENCY, signal }: MultiEventsOptions = {},
 ): Promise<MultiEventsResult> {

@@ -11,8 +11,30 @@ export interface RequestOptions {
 }
 
 /** GET mot Google Calendar API med token, nya försök och väntetid. Returnerar orörd JSON. */
-export interface GoogleClient {
+export interface GoogleReader {
   getJson(path: string, params?: QueryParams, options?: RequestOptions): Promise<unknown>
+}
+
+export type WriteMethod = 'POST' | 'PATCH' | 'DELETE'
+
+export interface WriteRequest extends RequestOptions {
+  params?: QueryParams
+  /** Skickas som JSON. */
+  body?: unknown
+  /** Skickas som If-Match. Google svarar 412 om händelsen ändrats sedan dess (PROJECT.md §5.3). */
+  ifMatch?: string
+  /** Tillåt tomt svar (204 No Content), t.ex. vid DELETE. Då returneras `undefined`. */
+  allowEmpty?: boolean
+}
+
+/**
+ * Läsande och skrivande anrop mot Google Calendar API. Skrivande anrop görs inte om efter nätverksfel
+ * eller 5xx, eftersom Google kan ha hunnit utföra ändringen. Det som väntas ut är rate limit (429 och
+ * 403 med rate limit-orsak), där anropet säkert inte utfördes. Den som anropar ansvarar för att göra
+ * ändringen idempotent (se `insertEvent`) och för att ange `ifMatch`.
+ */
+export interface GoogleClient extends GoogleReader {
+  requestJson(method: WriteMethod, path: string, request?: WriteRequest): Promise<unknown>
 }
 
 export interface GoogleClientOptions {
@@ -126,7 +148,11 @@ function judge(response: Response, body: unknown): Verdict {
     return { action: 'fail', failure: new GoogleApiError('forbidden', status) }
   }
   if (status === 404) return { action: 'fail', failure: new GoogleApiError('notFound', status) }
+  if (status === 409) return { action: 'fail', failure: new GoogleApiError('conflict', status) }
   if (status === 410) return { action: 'fail', failure: new GoogleApiError('gone', status) }
+  if (status === 412) {
+    return { action: 'fail', failure: new GoogleApiError('preconditionFailed', status) }
+  }
   return { action: 'fail', failure: new GoogleApiError('badRequest', status) }
 }
 
@@ -170,53 +196,96 @@ export function createGoogleClient(options: GoogleClientOptions): GoogleClient {
     return Math.min(maxDelayMs, Math.max(jittered, serverHintMs ?? 0))
   }
 
-  return {
-    async getJson(path, params, { signal } = {}) {
-      const url = buildUrl(baseUrl, path, params)
-      let retries = 0
-      let refreshedAfter401 = false
+  interface SendOptions {
+    method: 'GET' | WriteMethod
+    params?: QueryParams
+    body?: unknown
+    ifMatch?: string
+    signal?: AbortSignal
+    allowEmpty?: boolean
+  }
 
-      for (;;) {
-        signal?.throwIfAborted()
-        const token = await getAccessToken()
+  /**
+   * Gemensam väg för alla anrop: token, 401-förnyelse, väntetid och felklassning. Läsning görs om vid
+   * nätverksfel och 5xx. Skrivning görs inte om då, eftersom Google kan ha utfört ändringen. Rate limit
+   * väntas ut för båda.
+   */
+  async function send(path: string, options: SendOptions): Promise<unknown> {
+    const { method, params, body, ifMatch, signal, allowEmpty = false } = options
+    const isRead = method === 'GET'
+    const url = buildUrl(baseUrl, path, params)
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    if (body !== undefined) headers['Content-Type'] = 'application/json'
+    if (ifMatch !== undefined) headers['If-Match'] = ifMatch
+    // Läsningar delar på gränsen för samtidiga anrop. Skrivningar köar inte bakom dem, så att en
+    // ändring inte väntar på en lång rad hämtningar.
+    const slot = isRead ? withSlot : <T>(task: () => Promise<T>) => task()
 
-        let response: Response
-        try {
-          response = await withSlot(() =>
-            fetchFn(url, {
-              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-              ...(signal && { signal }),
-            }),
-          )
-        } catch (error) {
-          // Ett avbrutet anrop är inget fel hos Google och ska inte göras om.
-          if (signal?.aborted) throw error
-          if (retries >= maxRetries) throw new GoogleApiError('network')
-          await sleep(backoffDelay(retries, undefined), signal)
-          retries += 1
-          continue
-        }
+    let retries = 0
+    let refreshedAfter401 = false
 
-        if (response.ok) {
-          const body = await readJson(response)
-          if (body === undefined) throw new GoogleApiError('badResponse', response.status)
-          return body
-        }
+    for (;;) {
+      signal?.throwIfAborted()
+      const token = await getAccessToken()
 
-        if (response.status === 401) {
-          // Token kan ha gått ut eller återkallats. Hämta en ny och försök en gång till direkt. Hjälper
-          // inte det är åtkomsten borta och användaren måste koppla om.
-          if (refreshedAfter401) throw new GoogleAccessError('access_revoked')
-          refreshedAfter401 = true
-          invalidateToken()
-          continue
-        }
-
-        const verdict = judge(response, await readJson(response))
-        if (verdict.action === 'fail' || retries >= maxRetries) throw verdict.failure
-        await sleep(backoffDelay(retries, verdict.retryAfterMs), signal)
+      let response: Response
+      try {
+        response = await slot(() =>
+          fetchFn(url, {
+            method,
+            headers: { ...headers, Authorization: `Bearer ${token}` },
+            ...(body !== undefined && { body: JSON.stringify(body) }),
+            ...(signal && { signal }),
+          }),
+        )
+      } catch (error) {
+        // Ett avbrutet anrop är inget fel hos Google och ska inte göras om.
+        if (signal?.aborted) throw error
+        if (!isRead || retries >= maxRetries) throw new GoogleApiError('network')
+        await sleep(backoffDelay(retries, undefined), signal)
         retries += 1
+        continue
       }
+
+      if (response.ok) {
+        const parsed = await readJson(response)
+        if (parsed === undefined) {
+          if (allowEmpty) return undefined
+          throw new GoogleApiError('badResponse', response.status)
+        }
+        return parsed
+      }
+
+      if (response.status === 401) {
+        // Token kan ha gått ut eller återkallats. Hämta en ny och försök en gång till direkt. Hjälper
+        // inte det är åtkomsten borta och användaren måste koppla om.
+        if (refreshedAfter401) throw new GoogleAccessError('access_revoked')
+        refreshedAfter401 = true
+        invalidateToken()
+        continue
+      }
+
+      const verdict = judge(response, await readJson(response))
+      if (verdict.action === 'fail' || retries >= maxRetries) throw verdict.failure
+      if (!isRead && verdict.failure.kind === 'server') throw verdict.failure
+      await sleep(backoffDelay(retries, verdict.retryAfterMs), signal)
+      retries += 1
+    }
+  }
+
+  return {
+    getJson(path, params, { signal } = {}) {
+      return send(path, { method: 'GET', ...(params && { params }), ...(signal && { signal }) })
+    },
+    requestJson(method, path, { params, body, ifMatch, signal, allowEmpty } = {}) {
+      return send(path, {
+        method,
+        ...(params && { params }),
+        ...(body !== undefined && { body }),
+        ...(ifMatch !== undefined && { ifMatch }),
+        ...(signal && { signal }),
+        ...(allowEmpty !== undefined && { allowEmpty }),
+      })
     },
   }
 }

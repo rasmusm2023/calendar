@@ -4,9 +4,27 @@ export {
   createGoogleClient,
   type GoogleClient,
   type GoogleClientOptions,
+  type GoogleReader,
   type QueryParams,
   type RequestOptions,
+  type WriteMethod,
+  type WriteRequest,
 } from './client'
+export {
+  deleteEvent,
+  generateEventId,
+  getEvent,
+  insertEvent,
+  moveEvent,
+  patchEvent,
+  type DeleteOptions,
+  type EventChanges,
+  type EventRef,
+  type EventTime,
+  type NewEvent,
+  type PatchOptions,
+  type WriteOptions,
+} from './eventWrites'
 export {
   listCalendars,
   listEvents,

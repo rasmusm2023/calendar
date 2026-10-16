@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { weekRange } from '@/lib/dates'
-import type { GoogleClient, QueryParams } from './client'
+import type { GoogleReader, QueryParams } from './client'
 import { listCalendars, listEvents, listEventsForCalendars } from './calendar'
 import { GoogleAccessError, GoogleApiError } from './errors'
 
@@ -23,7 +23,7 @@ function fakeClient(responder: Responder) {
     calls.push(call)
     return Promise.resolve().then(() => responder(call, calls.length - 1))
   })
-  const client: GoogleClient = { getJson: (path, params) => getJson(path, params) }
+  const client: GoogleReader = { getJson: (path, params) => getJson(path, params) }
   return { client, calls }
 }
 
@@ -166,7 +166,7 @@ describe('listEvents', () => {
   })
 
   it('skickar vidare avbrottssignalen', async () => {
-    const getJson = vi.fn<GoogleClient['getJson']>(() => Promise.resolve({ items: [] }))
+    const getJson = vi.fn<GoogleReader['getJson']>(() => Promise.resolve({ items: [] }))
     const controller = new AbortController()
 
     await listEvents({ getJson }, { calendarId: 'c', ...WEEK }, { signal: controller.signal })
@@ -232,7 +232,7 @@ describe('listEventsForCalendars', () => {
   it('hämtar högst fyra kalendrar samtidigt som standard', async () => {
     let inFlight = 0
     let maxInFlight = 0
-    const client: GoogleClient = {
+    const client: GoogleReader = {
       getJson: async () => {
         inFlight += 1
         maxInFlight = Math.max(maxInFlight, inFlight)
@@ -251,7 +251,7 @@ describe('listEventsForCalendars', () => {
   it('respekterar angiven samtidighet', async () => {
     let inFlight = 0
     let maxInFlight = 0
-    const client: GoogleClient = {
+    const client: GoogleReader = {
       getJson: async () => {
         inFlight += 1
         maxInFlight = Math.max(maxInFlight, inFlight)
