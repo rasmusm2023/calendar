@@ -16,6 +16,7 @@ functions/.env
 functions/.env.*
 !functions/.env.example
 !functions/.env.demo-spaces-calendar-fn
+!functions/.env.demo-spaces-calendar
 functions/.secret.local
 .secret.local
 *.local

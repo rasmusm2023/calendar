@@ -22,13 +22,12 @@ Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid för
 
 Klart: steg 0.1–0.14. Steg 0.14 är Google-klienten (src/lib/google/client.ts och calendar.ts): token, ett nytt försök vid 401, exponentiell backoff med jitter vid 429/5xx/rate limit-403/nätverksfel (Retry-After följs), paginering, listCalendars, listEvents och listEventsForCalendars (4 kalendrar åt gången, en trasig kalender stoppar inte de andra). Steg 0.13 är token i minnet (`src/lib/google/token.ts`), Google Identity Services (`gis.ts`), funktionsklienten (`src/lib/firebase/googleFunctions.ts`) och `src/features/google-access/` med "Koppla Google Calendar"/"Koppla om"-skärmar. Token glöms vid utloggning och byte av användare. Inte provat mot riktiga Google ännu (kräver deploy av functions och steg 0.20). Steg 0.12 är Cloud Functions `googleConnect` och `googleAccessToken` i `functions/` (35 enhetstester och 11 emulatortester via `npm run test:functions:emulator`, ännu inte deployade). Steg 0.1–0.11 är scaffold, lint, Tailwind/shadcn, tester, i18n, datum, färg, Google-scheman, Firebase init + regler och Google-inloggning med bestående session.
 
-Kvar: 0.19 E2E, 0.20 riktig acceptans.
+Kvar: 0.20 riktig acceptans (kräver deploy av functions till calendar-38155, kräver ditt ja).
 
 ## Kända problem
 
-- E2E `e2e/auth.spec.ts`, första testet är `test.fixme`. Vid kallstart av Auth-emulatorn lyckas inte inloggningspopupen koppla tillbaka till sidan. Utredning: emulatorns iframe (`/emulator/auth/iframe`) skapas först vid klick och dess `https://apis.google.com/js/api.js` blir aldrig klar medan popupen är öppen (även med `route.fetch`, och nätverket är OK enligt curl). Testet "popup stängs, försök igen" går igenom eftersom iframen hinner laddas när popupen stängts. `networkidle` hjälper inte. Nästa idé: i hjälpfunktionen, öppna och stäng popupen först, vänta tills iframen är `complete`, klicka sedan igen.
 - `npm audit`: 7 high från shadcn-CLI (inte åtgärdat med flit).
 - Bundlen ger chunk-varning (1,2 MB, mest Firebase och FullCalendar). Code-splitting senare, t.ex. lazy-ladda veckovyn.
 - PROJECT.md är otydlig om var `settings` ligger (`users/{uid}` eller `users/{uid}/settings/{doc}`). Reglerna tillåter båda.
 - Dubbel frontmatter i `.cursor/rules/project.mdc`.
-- E2E-testerna i `e2e/auth.spec.ts` använder knappen "Logga ut" som tecken på inloggad användare, eftersom appen nu stannar på kopplingsskärmen tills Google är kopplat. Functions-emulatorn startas inte i Playwright än (steg 0.19).
+- Google Calendar API mockas i E2E med Playwrights page.route i stället för MSW (PROJECT.md nämner MSW). Samma effekt i webbläsaren utan service worker. Föreslå uppdatering av PROJECT.md om du vill behålla det som standard.

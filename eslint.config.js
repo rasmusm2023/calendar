@@ -31,7 +31,16 @@ const noHexInComponents = [
 ]
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'playwright-report', 'test-results', 'functions/lib'] },
+  {
+    ignores: [
+      'dist',
+      'coverage',
+      'playwright-report',
+      'test-results',
+      'functions/lib',
+      'e2e/support/*.mjs',
+    ],
+  },
 
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

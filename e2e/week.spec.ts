@@ -1,0 +1,152 @@
+import { expect, test, type Page } from '@playwright/test'
+import { clearAuthAccounts, signIn } from './support/auth.ts'
+import {
+  fakeGoogle,
+  mockCalendarApi,
+  stubGoogleIdentityServices,
+  zonedTime,
+  type CalendarApiMock,
+  type FakeCalendar,
+  type FakeEvent,
+} from './support/google.ts'
+
+const CALENDARS: FakeCalendar[] = [
+  { id: 'work', name: 'Jobb', color: '#e11d48', selected: true, primary: true },
+  { id: 'private', name: 'Privat', color: '#2563eb', selected: true },
+  { id: 'holidays', name: 'Helgdagar', color: '#16a34a', selected: false },
+]
+
+const EVENTS: Record<string, FakeEvent[]> = {
+  work: [
+    { id: 'w1', title: 'Planering', start: zonedTime(0, '09:00'), end: zonedTime(0, '10:00') },
+    { id: 'w2', title: 'Veckomöte', start: zonedTime(7, '09:00'), end: zonedTime(7, '10:00') },
+  ],
+  private: [
+    { id: 'p1', title: 'Tandläkare', start: zonedTime(0, '13:00'), end: zonedTime(0, '14:00') },
+  ],
+  holidays: [
+    {
+      id: 'h1',
+      title: 'Nationaldag',
+      start: zonedTime(0, '00:00').slice(0, 10),
+      end: zonedTime(1, '00:00').slice(0, 10),
+      allDay: true,
+    },
+  ],
+}
+
+test.beforeEach(async ({ request }) => {
+  await clearAuthAccounts(request)
+  await fakeGoogle.reset(request)
+})
+
+/** Loggar in, kopplar Google Calendar (riktiga Cloud Functions i emulatorn) och väntar på veckovyn. */
+async function openWeek(page: Page, setup?: (api: CalendarApiMock) => void) {
+  await stubGoogleIdentityServices(page)
+  const api = await mockCalendarApi(page, { calendars: CALENDARS, events: EVENTS })
+  setup?.(api)
+
+  await signIn(page)
+  await page.getByRole('button', { name: 'Koppla Google Calendar' }).click()
+  await expect(page.getByTestId('app-root')).toBeVisible()
+  return api
+}
+
+function event(page: Page, title: string) {
+  return page.locator('.fc-event', { hasText: title })
+}
+
+test('koppla Google Calendar och se veckan med kalenderfärger och kalendervalg', async ({
+  page,
+}) => {
+  await openWeek(page)
+
+  // Kalendrar som är tända i Google visas, med kalenderns färg. Släckta kalendrar visas inte.
+  await expect(event(page, 'Planering')).toBeVisible()
+  await expect(event(page, 'Tandläkare')).toBeVisible()
+  await expect(event(page, 'Nationaldag')).toHaveCount(0)
+  await expect(event(page, 'Planering')).toHaveCSS('background-color', 'rgb(225, 29, 72)')
+  await expect(event(page, 'Tandläkare')).toHaveCSS('background-color', 'rgb(37, 99, 235)')
+
+  // Flera kalendrar samtidigt, och ett val som går att ändra.
+  await expect(page.getByRole('checkbox', { name: 'Jobb' })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Privat' })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Helgdagar' })).not.toBeChecked()
+  await page.getByRole('checkbox', { name: 'Helgdagar' }).check()
+  await expect(event(page, 'Nationaldag')).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Privat' }).uncheck()
+  await expect(event(page, 'Tandläkare')).toHaveCount(0)
+  await expect(event(page, 'Planering')).toBeVisible()
+
+  // Bläddra: nästa vecka har andra händelser, och "Idag" tar tillbaka.
+  await page.getByRole('button', { name: 'Nästa vecka' }).click()
+  await expect(event(page, 'Veckomöte')).toBeVisible()
+  await expect(event(page, 'Planering')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Idag' }).click()
+  await expect(event(page, 'Planering')).toBeVisible()
+
+  // Efter omladdning är man kvar inloggad och kopplad, utan att behöva koppla om, och valet finns kvar.
+  await page.reload()
+  await expect(page.getByTestId('app-root')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Koppla Google Calendar' })).toHaveCount(0)
+  await expect(event(page, 'Planering')).toBeVisible()
+  await expect(event(page, 'Nationaldag')).toBeVisible()
+  await expect(event(page, 'Tandläkare')).toHaveCount(0)
+  await expect(page.getByRole('checkbox', { name: 'Privat' })).not.toBeChecked()
+})
+
+test('återkallad åtkomst ger "Koppla om" och veckan visas igen efter ny koppling', async ({
+  page,
+  request,
+}) => {
+  const api = await openWeek(page)
+  await expect(event(page, 'Planering')).toBeVisible()
+
+  // Användaren återkallar åtkomsten hos Google: token-servern vägrar förnya och Calendar API ger 401.
+  await fakeGoogle.revoke(request)
+  api.unauthorized = true
+  await page.getByRole('button', { name: 'Nästa vecka' }).click()
+
+  await expect(page.getByRole('button', { name: 'Koppla om' })).toBeVisible()
+  await expect(page.getByTestId('app-root')).toHaveCount(0)
+
+  // Ny koppling.
+  await fakeGoogle.restore(request)
+  api.unauthorized = false
+  await page.getByRole('button', { name: 'Koppla om' }).click()
+
+  await expect(page.getByTestId('app-root')).toBeVisible()
+  await expect(event(page, 'Planering')).toBeVisible()
+})
+
+test('en kalender som inte går att hämta stoppar inte de andra och går att försöka igen', async ({
+  page,
+}) => {
+  const api = await openWeek(page, (mock) => {
+    mock.forbidden.add('work')
+  })
+
+  await expect(event(page, 'Tandläkare')).toBeVisible()
+  await expect(event(page, 'Planering')).toHaveCount(0)
+  const warning = page.getByTestId('calendar-events-error')
+  await expect(warning).toContainText('1 av 2 kalendrar visas inte')
+
+  api.forbidden.clear()
+  await warning.getByRole('button', { name: 'Försök igen' }).click()
+
+  await expect(event(page, 'Planering')).toBeVisible()
+  await expect(warning).toHaveCount(0)
+  await expect(event(page, 'Tandläkare')).toBeVisible()
+})
+
+test('hämtar bara veckan som visas', async ({ page }) => {
+  const api = await openWeek(page)
+  await expect(event(page, 'Planering')).toBeVisible()
+
+  const first = api.eventRequests.at(0)
+  expect(first).toBeDefined()
+  const span = Date.parse(first?.timeMax ?? '') - Date.parse(first?.timeMin ?? '')
+  // En vecka, plus/minus en timme för sommartidsbyte.
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+  expect(Math.abs(span - WEEK_MS)).toBeLessThanOrEqual(60 * 60 * 1000)
+})

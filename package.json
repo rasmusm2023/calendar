@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "test:rules": "firebase emulators:exec --only firestore --project demo-spaces-calendar-rules \"vitest run --config vitest.rules.config.ts\"",
     "emulators": "firebase emulators:start --project demo-spaces-calendar",
+    "emulators:e2e": "npm run build:functions && firebase emulators:start --only auth,firestore,functions --project demo-spaces-calendar",
     "e2e": "playwright test",
     "preview": "vite preview"
   },

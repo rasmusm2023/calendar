@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const PORT = 5173
-const AUTH_EMULATOR_PORT = 9099
+const FUNCTIONS_EMULATOR_PORT = 5001
+const FAKE_GOOGLE_PORT = 9778
 
 export default defineConfig({
   testDir: './e2e',
@@ -22,11 +23,19 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      // Bara Auth-emulatorn behövs för E2E i Fas 0 (Google-API:et mockas).
-      command: 'npx firebase emulators:start --only auth --project demo-spaces-calendar',
-      url: `http://127.0.0.1:${String(AUTH_EMULATOR_PORT)}`,
+      // Auth, Firestore och Functions (googleConnect/googleAccessToken) körs på riktigt i emulatorerna.
+      // Bara Google själv är låtsas: token-servern nedan och Calendar API/GIS som mockas i testerna.
+      command: 'npm run emulators:e2e',
+      // Funktionen svarar 400 på GET när den är laddad (404 innan), så det här väntar på att den finns.
+      url: `http://127.0.0.1:${String(FUNCTIONS_EMULATOR_PORT)}/demo-spaces-calendar/europe-west3/googleAccessToken`,
       reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
+      timeout: 120_000,
+    },
+    {
+      // Låtsas-Googles token-endpoint (functions/.env.demo-spaces-calendar pekar hit).
+      command: 'node e2e/support/fakeGoogleServer.mjs',
+      url: `http://127.0.0.1:${String(FAKE_GOOGLE_PORT)}/health`,
+      reuseExistingServer: !process.env.CI,
     },
     {
       command: 'npm run dev:emulator',
