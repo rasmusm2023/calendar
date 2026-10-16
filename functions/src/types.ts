@@ -63,11 +63,15 @@ export type OAuthFailureKind = 'invalid_grant' | 'unavailable' | 'rejected'
 
 export class OAuthError extends Error {
   readonly kind: OAuthFailureKind
+  /** Googles felkod (t.ex. invalid_client) vid 
+ejected. En kort kod utan känsliga uppgifter, till för felsökning. */
+  readonly googleError: string | undefined
 
-  constructor(kind: OAuthFailureKind) {
+  constructor(kind: OAuthFailureKind, googleError?: string) {
     super(kind)
     this.name = 'OAuthError'
     this.kind = kind
+    this.googleError = googleError
   }
 }
 

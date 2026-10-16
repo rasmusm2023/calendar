@@ -99,6 +99,23 @@ describe('exchangeCode', () => {
     expect(await kindOf(client.exchangeCode('c'))).toBe('rejected')
   })
 
+  it('tar med Googles felkod vid avvisning, men aldrig fritext', async () => {
+    const { client } = clientWith(() =>
+      json({ error: 'invalid_client', error_description: 'secret hemlig text' }, 401),
+    )
+    const error: unknown = await client.exchangeCode('c').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(OAuthError)
+    expect((error as OAuthError).googleError).toBe('invalid_client')
+    expect((error as OAuthError).message).not.toContain('hemlig')
+  })
+
+  it('ignorerar en felkod som inte ser ut som en kod', async () => {
+    const { client } = clientWith(() => json({ error: 'Detta är fritext, inte en kod' }, 400))
+    const error: unknown = await client.exchangeCode('c').catch((e: unknown) => e)
+
+    expect((error as OAuthError).googleError).toBeUndefined()
+  })
   it.each([429, 500, 503])('behandlar HTTP %i som tillfälligt fel', async (status) => {
     const { client } = clientWith(() => json({ error: 'backend_error' }, status))
     expect(await kindOf(client.exchangeCode('c'))).toBe('unavailable')

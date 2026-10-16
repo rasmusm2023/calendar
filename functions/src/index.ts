@@ -8,10 +8,11 @@ import {
   type CallableOptions,
   type FunctionsErrorCode,
 } from 'firebase-functions/v2/https'
+import { ConfigError, findConfigProblem } from './config'
 import { connectGoogle, getAccessToken } from './core'
 import { createGoogleOAuthClient } from './oauth'
 import { createFirestoreTokenStore } from './store'
-import { GoogleAccessError, type Dependencies, type FailureReason } from './types'
+import { GoogleAccessError, OAuthError, type Dependencies, type FailureReason } from './types'
 
 const REGION = 'europe-west3'
 
@@ -32,11 +33,20 @@ function createDependencies(): Dependencies {
   const tokenUrl =
     process.env.FUNCTIONS_EMULATOR === 'true' ? process.env.GOOGLE_OAUTH_TOKEN_URL : undefined
 
+  const clientId = googleClientId.value()
+  const clientSecret = googleClientSecret.value()
+  // Fel i secrets ska ge ett tydligt fel i loggen i stället för ett obegripligt svar från Google.
+  // Emulatorn och E2E använder låtsasvärden som inte följer Googles format.
+  if (process.env.FUNCTIONS_EMULATOR !== 'true') {
+    const problem = findConfigProblem({ clientId, clientSecret })
+    if (problem !== null) throw new ConfigError(problem)
+  }
+
   return {
     store: createFirestoreTokenStore(getFirestore()),
     oauth: createGoogleOAuthClient({
-      clientId: googleClientId.value(),
-      clientSecret: googleClientSecret.value(),
+      clientId,
+      clientSecret,
       ...(tokenUrl !== undefined && tokenUrl !== '' ? { tokenUrl } : {}),
     }),
     now: () => Date.now(),
@@ -58,6 +68,18 @@ function toHttpsError(error: unknown): HttpsError {
   if (error instanceof HttpsError) return error
   if (error instanceof GoogleAccessError) {
     return new HttpsError(CODE_BY_REASON[error.reason], error.reason, { reason: error.reason })
+  }
+  if (error instanceof ConfigError) {
+    logger.error('Felaktigt konfigurerade secrets', { problem: error.problem })
+    return new HttpsError('internal', 'internal')
+  }
+  if (error instanceof OAuthError) {
+    // Googles felkod (t.ex. invalid_client) är en kort uppräkning utan känsliga uppgifter.
+    logger.error('Google avvisade token-anropet', {
+      kind: error.kind,
+      googleError: error.googleError ?? 'unknown',
+    })
+    return new HttpsError('internal', 'internal')
   }
   // Logga bara typen, aldrig meddelandet, eftersom det i teorin kan innehålla känsliga uppgifter.
   logger.error('Oväntat fel i Google-funktion', {

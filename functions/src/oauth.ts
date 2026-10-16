@@ -65,7 +65,10 @@ export function createGoogleOAuthClient(config: GoogleOAuthConfig): OAuthClient 
     if (failure.success && failure.data.error === 'invalid_grant') {
       throw new OAuthError('invalid_grant')
     }
-    throw new OAuthError('rejected')
+    // Googles felkod är en kort uppräkning (invalid_client, redirect_uri_mismatch ...). Bara den tas med.
+    const googleError =
+      failure.success && /^[a-z_]{1,64}$/.test(failure.data.error) ? failure.data.error : undefined
+    throw new OAuthError('rejected', googleError)
   }
 
   return {
