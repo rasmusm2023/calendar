@@ -220,3 +220,41 @@ test('veckovyn scrollar till aktuell tid och visar nu-linjen', async ({ page }) 
   await expect(nowLine).toBeAttached()
   await expect(nowLine).toBeInViewport()
 })
+
+test('förhämtar grannveckorna så att bläddring inte hämtar något nytt', async ({ page }) => {
+  const api = await openWeek(page)
+  await expect(event(page, 'Planering')).toBeVisible()
+
+  // Två kalendrar och tre veckor: den öppna, nästa och föregående.
+  await expect.poll(() => api.eventRequests.length).toBe(6)
+  expect(new Set(api.eventRequests.map((request) => request.timeMin)).size).toBe(3)
+
+  await page.getByRole('button', { name: 'Nästa vecka' }).click()
+  await expect(event(page, 'Veckomöte')).toBeVisible()
+  await expect(event(page, 'Planering')).toHaveCount(0)
+
+  // Veckan hämtades inte om när den öppnades (datan var färsk), bara dess nya granne hämtas.
+  await expect.poll(() => api.eventRequests.length).toBe(8)
+  const perWeek = new Map<string, number>()
+  for (const { timeMin } of api.eventRequests) perWeek.set(timeMin, (perWeek.get(timeMin) ?? 0) + 1)
+  expect(perWeek.size).toBe(4)
+  expect([...perWeek.values()]).toEqual([2, 2, 2, 2])
+})
+
+test('uppdaterar öppen vecka när något ändrats hos Google, utan att användaren gör något', async ({
+  page,
+}) => {
+  await page.clock.install()
+  const api = await openWeek(page)
+  await expect(event(page, 'Planering')).toBeVisible()
+
+  // Ändringen görs utanför appen (t.ex. i Googles egen kalender).
+  const planning = api.events.work.find((e) => e.id === 'w1')
+  expect(planning).toBeDefined()
+  if (planning) planning.title = 'Planering flyttad'
+  await expect(event(page, 'Planering flyttad')).toHaveCount(0)
+
+  await page.clock.fastForward(61_000)
+
+  await expect(event(page, 'Planering flyttad')).toBeVisible()
+})

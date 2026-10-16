@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useCalendars, useEventsForCalendars, type StyleContext } from '@/features/events'
+import {
+  useCalendars,
+  useEventsForCalendars,
+  usePrefetchEvents,
+  type StyleContext,
+} from '@/features/events'
 import { getBrowserTimeZone } from '@/lib/dates'
 import { GoogleAccessError, GoogleApiError } from '@/lib/google'
 import { CalendarGrid } from './adapter/CalendarGrid'
@@ -59,6 +64,21 @@ export function CalendarPage() {
     range,
     timeZone,
     enabled: hasCalendars,
+  })
+
+  // Grannperioderna hämtas i bakgrunden när den öppna är klar. Nästa först, eftersom man oftast bläddrar framåt.
+  const neighborRanges = useMemo(
+    () =>
+      ([1, -1] as const).map((direction) =>
+        visibleRange(view, shiftAnchor(view, anchor, direction, timeZone), timeZone),
+      ),
+    [view, anchor, timeZone],
+  )
+  usePrefetchEvents({
+    calendars: visibleCalendars,
+    ranges: neighborRanges,
+    timeZone,
+    enabled: hasCalendars && !eventsResult.isFetching,
   })
 
   const goTo = (direction: -1 | 1) => {

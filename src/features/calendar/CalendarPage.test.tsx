@@ -144,6 +144,28 @@ describe('CalendarPage', () => {
     })
   })
 
+  it('förhämtar nästa och föregående vecka så att bläddring inte behöver vänta', async () => {
+    const { getJson, user } = await renderPage()
+    await screen.findByText('Händelse from-a')
+
+    // Förhämtningen startar kort efter att den öppna veckan är klar: nästa vecka först, sedan föregående.
+    await waitFor(() => {
+      expect(eventCalls(getJson).map(([, params]) => params?.timeMin)).toEqual([
+        expect.stringMatching(/^2026-10-19T00:00:00/),
+        expect.stringMatching(/^2026-10-26T00:00:00/),
+        expect.stringMatching(/^2026-10-12T00:00:00/),
+      ])
+    })
+
+    const callsBefore = eventCalls(getJson).length
+    await user.click(screen.getByRole('button', { name: 'Nästa vecka' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('v44')
+    })
+
+    expect(eventCalls(getJson).slice(callsBefore)).toEqual([])
+  })
+
   it('har en namngiven verktygsrad', async () => {
     await renderPage()
     await screen.findByText('Händelse from-a')

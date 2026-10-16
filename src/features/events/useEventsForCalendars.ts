@@ -1,17 +1,17 @@
 import { useQueries, type UseQueryResult } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { useGoogleAccess } from '@/features/google-access'
-import { toRfc3339, type DateRange } from '@/lib/dates'
+import type { DateRange } from '@/lib/dates'
 import {
   GoogleAccessError,
   GoogleApiError,
-  listEvents,
   type CalendarFailure,
   type EventsResult,
   type ParseIssue,
 } from '@/lib/google'
 import type { CalendarInfo, CalEvent } from '@/types'
-import { queryKeys } from './queryKeys'
+import { eventsQuery, EVENTS_POLL_INTERVAL_MS } from './eventsQuery'
+import { useCalendarIds } from './useCalendarIds'
 
 export interface UseEventsParams {
   /** De kalendrar som ska visas. Bara `id` används. */
@@ -41,12 +41,11 @@ export interface EventsForCalendars {
   refetch: () => void
 }
 
-const SEPARATOR = '\n'
-
 /**
  * Händelser för flera kalendrar och ett intervall. Varje kalender och intervall har en egen
  * cache-post, så att en kalender som misslyckas inte stoppar de andra och att byte av vecka
- * återanvänder redan hämtad data.
+ * återanvänder redan hämtad data. Det öppna intervallet hämtas om var 60:e sekund medan fliken
+ * syns, och när fönstret får fokus om datan hunnit bli gammal.
  */
 export function useEventsForCalendars({
   calendars,
@@ -56,12 +55,7 @@ export function useEventsForCalendars({
 }: UseEventsParams): EventsForCalendars {
   const { client } = useGoogleAccess()
 
-  // Kalenderlistan kan vara en ny array vid varje rendering. Nyckeln gör att vi bara byter när id:na byts.
-  const idsKey = calendars.map((calendar) => calendar.id).join(SEPARATOR)
-  const calendarIds = useMemo(() => (idsKey === '' ? [] : idsKey.split(SEPARATOR)), [idsKey])
-
-  const rangeStart = toRfc3339(range.start, timeZone)
-  const rangeEnd = toRfc3339(range.end, timeZone)
+  const calendarIds = useCalendarIds(calendars)
 
   const combine = useCallback(
     (results: UseQueryResult<EventsResult>[]): EventsForCalendars => {
@@ -105,14 +99,9 @@ export function useEventsForCalendars({
 
   return useQueries({
     queries: calendarIds.map((calendarId) => ({
-      queryKey: queryKeys.eventsInRange(calendarId, rangeStart, rangeEnd, timeZone),
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        listEvents(
-          client,
-          { calendarId, timeMin: range.start, timeMax: range.end, timeZone },
-          { signal },
-        ),
+      ...eventsQuery(client, { calendarId, range, timeZone }),
       enabled,
+      refetchInterval: EVENTS_POLL_INTERVAL_MS,
     })),
     combine,
   })
