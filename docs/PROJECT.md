@@ -96,10 +96,10 @@ Färger lagras aldrig per händelse i appen. En färgändring på en familj änd
 Om family.syncGoogleColor är på hittar man närmaste colorId (från colors.get, avstånd i OKLab) och skriver det till händelser i familjen, som en bakgrundsjobb-kö med batchning och backoff.
 
 5.3 Mutationer, optimism och ångra
-Alla ändringar går via kommandon i src/lib/undo/: { label, apply(): Promise, revert(): Promise, optimistic(cache), rollback(cache) }.
+Alla ändringar går via kommandon i src/lib/undo/: `{ label, key, announce?, coalesce?, forward, backward }`, där `forward` (görs) och `backward` (ångras) är steg `{ optimistic(), apply(): Promise, rollback() }`. Stegen beskriver ett absolut slutläge, inte en relativ ändring, så att de kan slås ihop och ångra alltid ger rätt läge. `UndoManager` (ren TypeScript) kör dem. React-delen (`UndoProvider`, `useUndo`, toasts) ligger i src/features/undo/.
 Flöde: optimistic → UI uppdateras direkt → apply mot Google → vid fel: rollback + toast med "Försök igen".
 Ångra kör revert som ett nytt kommando (gör om = apply igen).
-Serialisering per händelse: mutationer på samma eventId köas. Senaste ändringen vinner, och mellanliggande ändringar som inte startat slås ihop.
+Serialisering per händelse: mutationer med samma `key` (eventId) köas och körs ett i taget. Kommandon med `coalesce` (flytta, ändra längd, redigera, inte skapa eller ta bort) slås ihop: bara den sista av de väntande stegen skickas. Misslyckas den rullas cachen tillbaka till läget före det första ihopslagna steget.
 Konflikter: skicka If-Match: etag vid PATCH. Vid 412 hämtas händelsen igen och användaren informeras.
 5.4 Återkommande händelser
 Vi visar instanser (singleEvents=true) och expanderar aldrig RRULE själva.

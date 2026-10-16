@@ -15,6 +15,18 @@
     "loading": "Loading…",
     "retry": "Try again"
   },
+  "undo": {
+    "region": "Notifications",
+    "undo": "Undo",
+    "dismiss": "Close",
+    "undone": "Undid: {{label}}",
+    "redone": "Redid: {{label}}",
+    "failed": {
+      "do": "Couldn't save: {{label}}. The change was rolled back.",
+      "undo": "Couldn't undo: {{label}}.",
+      "redo": "Couldn't redo: {{label}}."
+    }
+  },
   "auth": {
     "signIn": {
       "title": "Sign in",

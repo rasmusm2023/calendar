@@ -4,6 +4,7 @@ import { I18nextProvider } from 'react-i18next'
 import { App, ConfigErrorScreen, ErrorBoundary, QueryProvider, applySystemTheme } from '@/app'
 import { AuthProvider, createFirebaseAuthService } from '@/features/auth'
 import { GoogleAccessProvider, createGoogleAccessService } from '@/features/google-access'
+import { UndoProvider } from '@/features/undo'
 import { setupAppI18n } from '@/i18n'
 import {
   EnvError,
@@ -25,7 +26,9 @@ function createContent(): ReactNode {
       <AuthProvider service={createFirebaseAuthService(auth)}>
         <GoogleAccessProvider service={googleAccess}>
           <QueryProvider>
-            <App />
+            <UndoProvider>
+              <App />
+            </UndoProvider>
           </QueryProvider>
         </GoogleAccessProvider>
       </AuthProvider>

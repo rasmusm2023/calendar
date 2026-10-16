@@ -22,7 +22,23 @@ Behövs senast före steg 0.20 (riktig acceptans mot Google). Fråga alltid för
 
 Klart: steg 0.1-0.20 (Fas 0), och functions är deployade till `calendar-38155` (`googleConnect` och `googleAccessToken`, `europe-west3`, 2026-10-16, med städpolicy för containerbilder i Artifact Registry). Steg 0.19 är E2E (Playwright, `npm run e2e`, 7 tester): Auth-, Firestore- och Functions-emulatorerna körs på riktigt (`npm run emulators:e2e`, `functions/.env.demo-spaces-calendar`) och bara Google är låtsas: en token-server (`e2e/support/fakeGoogleServer.mjs`, port 9778, styrbar med `/__control/revoke|restore`), GIS-skriptet stubbas och Calendar API mockas med Playwrights `page.route` (`e2e/support/google.ts`). Täcker inloggning och omladdning, koppling, veckovy med kalenderfärger och kalendervalg, bläddring, återkallad åtkomst, "Koppla om" och ny koppling, delvis misslyckad hämtning och att bara en vecka hämtas. Kallstartsflaket är löst: `signIn` öppnar och stänger först en popup. Steg 0.18 är fellägen: fel i stället för tom vecka, redan hämtad data behålls med varningen "Kunde inte uppdatera", och `ErrorBoundary` ("Ladda om"). Steg 0.17b är kalendervalet (`CalendarPicker`, `useCalendarSelection`, sparas i localStorage per användare, standard Googles `selected`, "Återställ till Googles val"). Steg 0.17 är veckosidan (`WeekPage`: verktygsrad, kalenderlista, händelser, laddning och fel). Steg 0.16 är FullCalendar-adaptern (`src/features/calendar/adapter/`, v6 pinnat, tider i webbläsarens zon). Steg 0.15 är TanStack Query (`QueryProvider`, `createQueryClient`, hooks i `src/features/events/`, gräns på 6 samtidiga Google-anrop). Steg 0.14 är Google-klienten (src/lib/google/client.ts och calendar.ts): token, ett nytt försök vid 401, exponentiell backoff med jitter vid 429/5xx/rate limit-403/nätverksfel (Retry-After följs), paginering, listCalendars, listEvents och listEventsForCalendars (4 kalendrar åt gången, en trasig kalender stoppar inte de andra). Steg 0.13 är token i minnet (`src/lib/google/token.ts`), Google Identity Services (`gis.ts`), funktionsklienten (`src/lib/firebase/googleFunctions.ts`) och `src/features/google-access/` med "Koppla Google Calendar"/"Koppla om"-skärmar. Token glöms vid utloggning och byte av användare. Inte provat mot riktiga Google ännu (kräver deploy av functions och steg 0.20). Steg 0.12 är Cloud Functions `googleConnect` och `googleAccessToken` i `functions/` (35 enhetstester och 11 emulatortester via `npm run test:functions:emulator`, ännu inte deployade). Steg 0.1–0.11 är scaffold, lint, Tailwind/shadcn, tester, i18n, datum, färg, Google-scheman, Firebase init + regler och Google-inloggning med bestående session.
 
-Kvar: Fas 0 är klar (steg 0.1-0.20). Steg 0.20, riktig acceptans mot Google, verifierades av dig 2026-10-16: inloggning, koppling, kalenderlista och händelser i veckovyn, omladdning utan ny inloggning, återkallad åtkomst som ger "Koppla om" och ny koppling som får tillbaka veckan. Nästa är Fas 1 enligt PRD avsnitt 10, men bara efter att du bestämt att den ska starta. Firestore-reglerna är inte deployade och behövs inte förrän klienten läser från Firestore.
+Kvar: Fas 0 är klar (steg 0.1-0.20). Steg 0.20, riktig acceptans mot Google, verifierades av dig 2026-10-16: inloggning, koppling, kalenderlista och händelser i veckovyn, omladdning utan ny inloggning, återkallad åtkomst som ger "Koppla om" och ny koppling som får tillbaka veckan. Fas 1 pågår, se nedan. Firestore-reglerna är inte deployade och behövs inte förrän klienten läser från Firestore.
+
+## Fas 1 - läge
+
+Ordning bestämd 2026-10-16: mutationer först (1.1, 1.2, sedan skapa, dra och redigera), vyerna efteråt. IndexedDB-cache skjuts upp till Fas 3.
+
+- [x] 1.1 Ångra-infrastruktur: `UndoManager` i `src/lib/undo/` (kommandon med `forward`/`backward`, köer per händelse, ihopslagning med `coalesce`, rollback, ångra/gör om, max 100) och `UndoProvider`/`useUndo`/toasts i `src/features/undo/` (fel med "Försök igen", "Ångra" för borttagningar, återkallad åtkomst leder till "Koppla om"). Kopplat i `main.tsx`.
+- [ ] 1.2 Skrivande Google-klient (skapa, ändra, ta bort, flytta; `If-Match`/etag, 412).
+- [ ] 1.3 Fler vyer: dag, N dagar, månad, schema, nu-linje.
+- [ ] 1.4 Synk: polling 60 s, fokus, förhämtning.
+- [ ] 1.5 Skapa med klick/drag och snabbpopover.
+- [ ] 1.6 Drag & drop: flytta, ändra längd, snäppning, Esc, heldag och tid.
+- [ ] 1.7 Redigeringspanel och påminnelser.
+- [ ] 1.8 Ta bort och duplicera.
+- [ ] 1.9 Återkommande händelser.
+- [ ] 1.10 Kortkommandon, ångra och gör om.
+- [ ] 1.11 E2E och 60 fps.
 
 ## Kända problem
 

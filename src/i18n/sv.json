@@ -15,6 +15,18 @@
     "loading": "Laddar…",
     "retry": "Försök igen"
   },
+  "undo": {
+    "region": "Aviseringar",
+    "undo": "Ångra",
+    "dismiss": "Stäng",
+    "undone": "Ångrade: {{label}}",
+    "redone": "Gjorde om: {{label}}",
+    "failed": {
+      "do": "Kunde inte spara: {{label}}. Ändringen har rullats tillbaka.",
+      "undo": "Kunde inte ångra: {{label}}.",
+      "redo": "Kunde inte göra om: {{label}}."
+    }
+  },
   "auth": {
     "signIn": {
       "title": "Logga in",
