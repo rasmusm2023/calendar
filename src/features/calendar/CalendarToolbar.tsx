@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { CircleHelp, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +24,8 @@ interface CalendarToolbarProps {
   onToday: () => void
   /** Skapa en händelse utan att peka i rutnätet. Knappen visas inte utan den. */
   onCreate?: () => void
+  /** Öppnar listan över kortkommandon. */
+  onShowShortcuts: () => void
 }
 
 const DAY_OPTIONS = Array.from({ length: MAX_DAYS - MIN_DAYS + 1 }, (_, i) => MIN_DAYS + i)
@@ -39,6 +41,7 @@ export function CalendarToolbar({
   onNext,
   onToday,
   onCreate,
+  onShowShortcuts,
 }: CalendarToolbarProps) {
   const { t } = useTranslation()
 
@@ -128,6 +131,14 @@ export function CalendarToolbar({
             )
           })}
         </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('calendar.shortcuts.open')}
+          onClick={onShowShortcuts}
+        >
+          <CircleHelp aria-hidden="true" />
+        </Button>
       </div>
     </div>
   )

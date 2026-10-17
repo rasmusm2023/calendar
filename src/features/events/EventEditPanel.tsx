@@ -35,6 +35,8 @@ export interface EventEditPanelProps {
   onDelete?: (scope: RecurringScope) => void
   /** Duplicerar händelsen som den var när panelen öppnades. Utan den visas ingen Duplicera-knapp. */
   onDuplicate?: () => void
+  /** Anropas när panelen stängts och fokus ska tillbaka, t.ex. till händelsen i rutnätet. */
+  onReturnFocus?: () => void
   onClose: () => void
 }
 
@@ -56,6 +58,7 @@ export function EventEditPanel({
   onSave,
   onDelete,
   onDuplicate,
+  onReturnFocus,
   onClose,
 }: EventEditPanelProps) {
   const { t } = useTranslation()
@@ -116,7 +119,14 @@ export function EventEditPanel({
         if (!open) onClose()
       }}
     >
-      <SheetContent data-testid="event-edit">
+      <SheetContent
+        data-testid="event-edit"
+        onCloseAutoFocus={(focusEvent) => {
+          if (onReturnFocus === undefined) return
+          focusEvent.preventDefault()
+          onReturnFocus()
+        }}
+      >
         <SheetTitle>{t(readOnly ? 'event.edit.viewDialog' : 'event.edit.dialog')}</SheetTitle>
         <SheetDescription>{t('event.edit.intro')}</SheetDescription>
 

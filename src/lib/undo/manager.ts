@@ -122,7 +122,13 @@ export class UndoManager {
         },
       })
     } else if (outcome.status === 'applied') {
-      this.emit({ type: 'undone', label: command.label })
+      this.emit({
+        type: 'undone',
+        label: command.label,
+        redo: () => {
+          void this.redo()
+        },
+      })
     }
     return outcome
   }

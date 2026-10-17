@@ -107,6 +107,10 @@ describe('UndoProvider', () => {
 
     expect(await screen.findByText('Ångrade: Ta bort Gympass')).toBeInTheDocument()
     expect(undone).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: 'Gör om' }))
+
+    expect(await screen.findByText('Gjorde om: Ta bort Gympass')).toBeInTheDocument()
   })
 
   it('visar ingen toast för lyckade ändringar utan announce', async () => {

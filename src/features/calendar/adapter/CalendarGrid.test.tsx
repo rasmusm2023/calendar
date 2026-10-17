@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { StyleContext } from '@/features/events'
 import { TEST_CALENDAR_COLOR } from '@/test/fixtures'
 import type { CalEvent } from '@/types'
@@ -34,6 +33,7 @@ interface Options {
   view?: CalendarView
   locale?: string
   monthFilledBlocks?: boolean
+  selected?: { calendarId: string; eventId: string } | null
 }
 
 function ui({
@@ -42,6 +42,7 @@ function ui({
   view: calendarView = WEEK,
   locale = 'sv',
   monthFilledBlocks,
+  selected,
 }: Options = {}) {
   return (
     <CalendarGrid
@@ -52,6 +53,7 @@ function ui({
       locale={locale}
       ariaLabel="Kalender"
       {...(monthFilledBlocks !== undefined && { monthFilledBlocks })}
+      {...(selected !== undefined && { selected })}
     />
   )
 }
@@ -235,65 +237,22 @@ describe('CalendarGrid', () => {
     })
   })
 
-  describe('tangentbord', () => {
-    function renderWithHandlers() {
-      const onEventDelete = vi.fn()
-      const onEventDuplicate = vi.fn()
-      render(
-        <CalendarGrid
-          events={[event('a')]}
-          styleContext={STYLE}
-          view={WEEK}
-          date={WEDNESDAY}
-          locale="sv"
-          ariaLabel="Kalender"
-          onEventDelete={onEventDelete}
-          onEventDuplicate={onEventDuplicate}
-        />,
+  describe('vald händelse', () => {
+    it('markerar den valda händelsen även utan fokus', () => {
+      const { rerender } = renderGrid({ events: [event('a'), event('b', { calendarId: 'work' })] })
+      const block = screen.getByText('Händelse a').closest('.fc-event')
+      expect(block).not.toHaveClass('sc-selected')
+
+      rerender(
+        ui({ events: [event('a'), event('b')], selected: { calendarId: 'work', eventId: 'a' } }),
       )
-      const block = screen.getByText('Händelse a').closest<HTMLElement>('.fc-event')
-      if (block === null) throw new Error('Händelsen ritades inte')
-      return { block, onEventDelete, onEventDuplicate, user: userEvent.setup() }
-    }
 
-    it('Delete och Backspace på en fokuserad händelse ber om att ta bort den', async () => {
-      const { block, onEventDelete, user } = renderWithHandlers()
-      block.focus()
-
-      await user.keyboard('{Delete}')
-      await user.keyboard('{Backspace}')
-
-      expect(onEventDelete).toHaveBeenCalledTimes(2)
-      expect(onEventDelete).toHaveBeenCalledWith({ calendarId: 'work', eventId: 'a' })
-    })
-
-    it('Ctrl+D duplicerar den fokuserade händelsen och stoppar webbläsarens bokmärke', async () => {
-      const { block, onEventDuplicate, user } = renderWithHandlers()
-      block.focus()
-
-      await user.keyboard('{Control>}d{/Control}')
-
-      expect(onEventDuplicate).toHaveBeenCalledExactlyOnceWith({ calendarId: 'work', eventId: 'a' })
-    })
-
-    it('Cmd+D duplicerar också (Mac)', async () => {
-      const { block, onEventDuplicate, user } = renderWithHandlers()
-      block.focus()
-
-      await user.keyboard('{Meta>}d{/Meta}')
-
-      expect(onEventDuplicate).toHaveBeenCalledOnce()
-    })
-
-    it('gör ingenting utan fokus på en händelse, eller med bara D', async () => {
-      const { block, onEventDelete, onEventDuplicate, user } = renderWithHandlers()
-
-      await user.keyboard('{Delete}{Control>}d{/Control}')
-      block.focus()
-      await user.keyboard('d')
-
-      expect(onEventDelete).not.toHaveBeenCalled()
-      expect(onEventDuplicate).not.toHaveBeenCalled()
+      expect(screen.getByText('Händelse a').closest('.fc-event')).toHaveClass('sc-selected')
+      expect(screen.getByText('Händelse a').closest('.fc-event')).toHaveAttribute(
+        'aria-current',
+        'true',
+      )
+      expect(screen.getByText('Händelse b').closest('.fc-event')).not.toHaveClass('sc-selected')
     })
   })
 })

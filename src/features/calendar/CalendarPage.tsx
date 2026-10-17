@@ -25,15 +25,19 @@ import {
   type StyleContext,
   type UpdateEventTimeRequest,
 } from '@/features/events'
+import { useUndo } from '@/features/undo'
 import { getBrowserTimeZone } from '@/lib/dates'
 import { GoogleAccessError, GoogleApiError, type EventTime } from '@/lib/google'
 import type { CalEvent } from '@/types'
 import { CalendarGrid } from './adapter/CalendarGrid'
 import { shiftAnchor, visibleRange } from './calendarView'
+import { focusCalendarEventSoon, type GridEventRef } from './eventTarget'
 import { CalendarPicker } from './CalendarPicker'
 import { CalendarToolbar } from './CalendarToolbar'
 import { defaultNewEventTime } from './newEventTime'
+import { ShortcutHelp } from './ShortcutHelp'
 import { useCalendarSelection } from './useCalendarSelection'
+import { useCalendarShortcuts } from './useCalendarShortcuts'
 import { useCalendarView } from './useCalendarView'
 import { useDraftAnchor } from './useDraftAnchor'
 import { formatViewTitle, viewWeekNumber } from './viewTitle'
@@ -52,6 +56,7 @@ interface Draft {
 /** En ändring av en förekomst av en återkommande händelse som väntar på svar på vad den gäller. */
 interface ScopeQuestion {
   mode: 'edit' | 'delete'
+  event: GridEventRef
   run: (scope: RecurringScope) => void
 }
 
@@ -183,10 +188,21 @@ export function CalendarPage() {
   }
 
   const events = eventsResult.events
+  const [picked, setPicked] = useState<GridEventRef | null>(null)
+  // Syns händelsen inte (borttagen, eller en annan period) är inget valt. Kommer den tillbaka gäller valet igen.
+  const selected =
+    picked !== null &&
+    events.some((event) => event.calendarId === picked.calendarId && event.id === picked.eventId)
+      ? picked
+      : null
+  const [helpOpen, setHelpOpen] = useState(false)
+  const { undo, redo } = useUndo()
+
   const openEvent = useCallback(
-    (ref: { calendarId: string; eventId: string }) => {
+    (ref: GridEventRef) => {
       const found = events.find((e) => e.calendarId === ref.calendarId && e.id === ref.eventId)
       if (found === undefined) return
+      setPicked(ref)
       setDraft(null)
       setEditing(found)
     },
@@ -209,6 +225,7 @@ export function CalendarPage() {
       if (isRecurringInstance(found)) {
         setAskScope({
           mode: 'delete',
+          event: ref,
           run: (scope) => {
             deleteEvent(ref, scope)
           },
@@ -223,8 +240,10 @@ export function CalendarPage() {
     (request: UpdateEventTimeRequest) => {
       const found = findEvent(request)
       if (found !== undefined && isRecurringInstance(found)) {
+        setPicked({ calendarId: request.calendarId, eventId: request.eventId })
         setAskScope({
           mode: 'edit',
+          event: { calendarId: request.calendarId, eventId: request.eventId },
           run: (scope) => {
             updateEventTime({ ...request, scope })
           },
@@ -246,6 +265,56 @@ export function CalendarPage() {
   const closeEditing = useCallback(() => {
     setEditing(null)
   }, [])
+
+  const focusEvent = useCallback((ref: GridEventRef) => {
+    const root = gridArea.current
+    if (root === null) return
+    focusCalendarEventSoon(root, ref)
+  }, [])
+
+  useCalendarShortcuts({
+    selected,
+    onSelect: setPicked,
+    onView: setKind,
+    onToday: () => {
+      setAnchor(new Date())
+    },
+    onNavigate: (direction) => {
+      setAnchor(shiftAnchor(view, anchor, direction, timeZone))
+    },
+    onCreate: () => {
+      if (defaultCalendarId === undefined) return
+      startDraft(defaultNewEventTime(range, anchor, new Date(), timeZone))
+    },
+    onEdit: openEvent,
+    onDelete: requestDelete,
+    onDuplicate: (ref) => {
+      requestDuplicate(ref)
+    },
+    onUndo: () => {
+      void undo()
+    },
+    onRedo: () => {
+      void redo()
+    },
+    onHelp: () => {
+      setHelpOpen(true)
+    },
+  })
+
+  const shortcutHelp = <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
+  const selectedEvent = events.find(
+    (event) =>
+      selected !== null &&
+      event.calendarId === selected.calendarId &&
+      event.id === selected.eventId,
+  )
+  const selectedLabel =
+    selectedEvent === undefined
+      ? ''
+      : selectedEvent.title === ''
+        ? t('event.untitled')
+        : selectedEvent.title
 
   const gridDraft = useMemo(
     () =>
@@ -283,6 +352,9 @@ export function CalendarPage() {
           startDraft(defaultNewEventTime(range, anchor, new Date(), timeZone))
         },
       })}
+      onShowShortcuts={() => {
+        setHelpOpen(true)
+      }}
     />
   )
 
@@ -299,6 +371,7 @@ export function CalendarPage() {
         >
           <Skeleton className="h-full min-h-64 w-full" />
         </div>
+        {shortcutHelp}
       </div>
     )
   }
@@ -316,6 +389,7 @@ export function CalendarPage() {
             }}
           />
         </div>
+        {shortcutHelp}
       </div>
     )
   }
@@ -381,6 +455,9 @@ export function CalendarPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {toolbar}
+      <p className="sr-only" aria-live="polite">
+        {selectedLabel === '' ? '' : t('calendar.shortcuts.selected', { title: selectedLabel })}
+      </p>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {allCalendars.length > 0 && (
           <aside
@@ -412,8 +489,7 @@ export function CalendarPage() {
               editableCalendarIds={editableCalendarIds}
               onEventTimeChange={requestTimeChange}
               onEventClick={openEvent}
-              onEventDelete={requestDelete}
-              onEventDuplicate={requestDuplicate}
+              selected={selected}
               onEventCopy={requestDuplicate}
               {...(defaultCalendarId !== undefined && { onSelectTime: startDraft })}
             />
@@ -453,6 +529,9 @@ export function CalendarPage() {
               requestDuplicate({ calendarId: editing.calendarId, eventId: editing.id })
             },
           })}
+          onReturnFocus={() => {
+            focusEvent({ calendarId: editing.calendarId, eventId: editing.id })
+          }}
           onClose={closeEditing}
         />
       )}
@@ -466,8 +545,12 @@ export function CalendarPage() {
           onCancel={() => {
             setAskScope(null)
           }}
+          restoreFocus={() => {
+            focusEvent(askScope.event)
+          }}
         />
       )}
+      {shortcutHelp}
     </div>
   )
 }

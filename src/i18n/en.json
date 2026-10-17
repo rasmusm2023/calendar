@@ -18,6 +18,7 @@
   "undo": {
     "region": "Notifications",
     "undo": "Undo",
+    "redo": "Redo",
     "dismiss": "Close",
     "undone": "Undid: {{label}}",
     "redone": "Redid: {{label}}",
@@ -92,7 +93,53 @@
       "title": "Some calendars could not be loaded",
       "description": "{{failed}} of {{total}} calendars are not shown. Events from the others are shown as usual."
     },
-    "truncated": "Some events are not shown because a calendar has a very large number of events this week."
+    "truncated": "Some events are not shown because a calendar has a very large number of events this week.",
+    "shortcuts": {
+      "open": "Keyboard shortcuts (?)",
+      "title": "Keyboard shortcuts",
+      "description": "On a Mac, use Cmd instead of Ctrl. These apply when you are not typing in a field.",
+      "close": "Close",
+      "selected": "Selected event: {{title}}",
+      "groups": {
+        "navigate": "Navigation",
+        "events": "Events",
+        "history": "Undo"
+      },
+      "keys": {
+        "day": "Day",
+        "week": "Week",
+        "days": "N days",
+        "month": "Month",
+        "agenda": "Schedule",
+        "today": "Today",
+        "next": "Next period",
+        "previous": "Previous period",
+        "create": "New event",
+        "edit": "Edit selected event",
+        "delete": "Delete selected event",
+        "duplicate": "Duplicate selected event",
+        "undo": "Undo",
+        "redo": "Redo",
+        "help": "Show this list"
+      },
+      "combos": {
+        "day": "D",
+        "week": "W",
+        "days": "N",
+        "month": "M",
+        "agenda": "A",
+        "today": "T",
+        "next": "J or →",
+        "previous": "K or ←",
+        "create": "C",
+        "edit": "E",
+        "delete": "Delete or Backspace",
+        "duplicate": "Ctrl+D",
+        "undo": "Ctrl+Z",
+        "redo": "Ctrl+Shift+Z or Ctrl+Y",
+        "help": "?"
+      }
+    }
   },
   "googleAccess": {
     "connect": {

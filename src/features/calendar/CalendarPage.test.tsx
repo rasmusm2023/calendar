@@ -177,8 +177,8 @@ describe('CalendarPage', () => {
     await screen.findByText('Händelse from-a')
 
     const toolbar = screen.getByRole('toolbar', { name: 'Kalendernavigering' })
-    // Ny händelse, idag, föregående, nästa och de fem vyerna.
-    expect(within(toolbar).getAllByRole('button')).toHaveLength(9)
+    // Ny händelse, idag, föregående, nästa, de fem vyerna och kortkommandon.
+    expect(within(toolbar).getAllByRole('button')).toHaveLength(10)
     expect(within(toolbar).getByRole('button', { name: 'Ny händelse' })).toBeEnabled()
   })
 
@@ -701,6 +701,109 @@ describe('CalendarPage', () => {
       await screen.findByText('Händelse from-a')
 
       expect(screen.queryByRole('button', { name: 'Ny händelse' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('kortkommandon', () => {
+    function viewButton(name: string) {
+      return within(screen.getByRole('group', { name: 'Vy' })).getByRole('button', { name })
+    }
+
+    it('byter vy, bläddrar och visar hjälpen', async () => {
+      const { user } = await renderPage()
+      await screen.findByText('Händelse from-a')
+
+      await user.keyboard('d')
+      expect(viewButton('Dag')).toHaveAttribute('aria-pressed', 'true')
+
+      await user.keyboard('w')
+      expect(viewButton('Vecka')).toHaveAttribute('aria-pressed', 'true')
+
+      await user.keyboard('j')
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('v44')
+      await user.keyboard('k')
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('v43')
+      await user.keyboard('{ArrowRight}')
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('v44')
+      await user.keyboard('t')
+      expect(screen.getByTestId('calendar-title')).toHaveTextContent('v43')
+
+      await user.keyboard('?')
+      expect(await screen.findByRole('dialog', { name: 'Kortkommandon' })).toBeInTheDocument()
+      expect(screen.getByText('Ctrl+Z')).toBeInTheDocument()
+    })
+
+    it('skriver inte om vyn medan man skriver en titel', async () => {
+      const { user } = await renderPage({ writer: () => ({}) })
+      await screen.findByText('Händelse from-a')
+
+      await user.keyboard('c')
+      const dialog = await screen.findByRole('dialog', { name: 'Ny händelse' })
+      await user.keyboard('d')
+
+      expect(within(dialog).getByRole('textbox', { name: 'Titel' })).toHaveValue('d')
+      expect(viewButton('Vecka')).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('tar bort och duplicerar den valda händelsen utan att den har fokus, och ångrar med Ctrl+Z', async () => {
+      const gone = new Set<string>()
+      const created: Record<string, unknown>[] = []
+      const { user, requestJson } = await renderPage({
+        writer: (method, path, request) => {
+          const id = decodeURIComponent(path.split('/').at(-1) ?? '')
+          if (method === 'DELETE') {
+            gone.add(id)
+            const index = created.findIndex((item) => item.id === id)
+            if (index >= 0) created.splice(index, 1)
+            return undefined
+          }
+          if (method === 'POST') {
+            const item = { ...(request.body as Record<string, unknown>), etag: '"srv"' }
+            created.push(item)
+            return item
+          }
+          return {}
+        },
+        events: (calendarId) => ({
+          items: [
+            ...[eventItem(`from-${calendarId}`)].filter((item) => !gone.has(item.id)),
+            ...created.filter(() => calendarId === 'a'),
+          ],
+        }),
+      })
+      await screen.findByText('Händelse from-a')
+      const blocks = () =>
+        [...document.querySelectorAll('.fc-event')].filter((element) =>
+          element.textContent.includes('Händelse from-a'),
+        )
+
+      await user.keyboard('{Delete}')
+      expect(blocks()).toHaveLength(1)
+
+      const block = blocks()[0]
+      if (!(block instanceof HTMLElement)) throw new Error('Händelsen ritades inte')
+      block.focus()
+      await waitFor(() => {
+        expect(block).toHaveClass('sc-selected')
+      })
+      await user.click(screen.getByRole('button', { name: 'Idag' }))
+      expect(block).not.toHaveFocus()
+
+      await user.keyboard('{Control>}d{/Control}')
+      await waitFor(() => {
+        expect(blocks()).toHaveLength(2)
+      })
+      expect(requestJson).toHaveBeenCalledWith('POST', '/calendars/a/events', expect.anything())
+
+      await user.keyboard('{Delete}')
+      await waitFor(() => {
+        expect(blocks()).toHaveLength(1)
+      })
+
+      await user.keyboard('{Control>}z{/Control}')
+      await waitFor(() => {
+        expect(blocks()).toHaveLength(2)
+      })
     })
   })
 })

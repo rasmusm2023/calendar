@@ -19,13 +19,23 @@ export interface RecurrenceScopeDialogProps {
   mode: 'edit' | 'delete'
   onConfirm: (scope: RecurringScope) => void
   onCancel: () => void
+  /**
+   * Dit fokus ska när frågan stängs. Utan den återställer dialogen fokus själv. Används när händelsen
+   * i rutnätet kan ha ritats om, så att det element som hade fokus inte finns kvar.
+   */
+  restoreFocus?: () => void
 }
 
 /**
  * Frågan som ställs innan en återkommande händelse ändras eller tas bort (PRD 6.7): bara den här, den här och
  * följande, eller alla. "Bara den här" är förvalt, eftersom det är minst ingripande. Esc och Avbryt gör ingenting.
  */
-export function RecurrenceScopeDialog({ mode, onConfirm, onCancel }: RecurrenceScopeDialogProps) {
+export function RecurrenceScopeDialog({
+  mode,
+  onConfirm,
+  onCancel,
+  restoreFocus,
+}: RecurrenceScopeDialogProps) {
   const { t } = useTranslation()
   const groupId = useId()
   const [scope, setScope] = useState<RecurringScope>('this')
@@ -37,7 +47,14 @@ export function RecurrenceScopeDialog({ mode, onConfirm, onCancel }: RecurrenceS
         if (!open) onCancel()
       }}
     >
-      <DialogContent data-testid="recurrence-scope">
+      <DialogContent
+        data-testid="recurrence-scope"
+        onCloseAutoFocus={(focusEvent) => {
+          if (restoreFocus === undefined) return
+          focusEvent.preventDefault()
+          restoreFocus()
+        }}
+      >
         <DialogTitle>
           {t(mode === 'edit' ? 'event.recurrence.editTitle' : 'event.recurrence.deleteTitle')}
         </DialogTitle>

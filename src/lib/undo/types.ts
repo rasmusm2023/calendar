@@ -64,7 +64,12 @@ export type UndoEvent =
       /** Ångrar ändringen. Finns så att en toast kan erbjuda "Ångra". */
       undo: () => void
     }
-  | { type: 'undone'; label: string }
+  | {
+      type: 'undone'
+      label: string
+      /** Gör om ändringen. Finns så att en toast kan erbjuda "Gör om". */
+      redo: () => void
+    }
   | { type: 'redone'; label: string }
 
 /** Oföränderlig ögonblicksbild av läget, för `useSyncExternalStore`. */

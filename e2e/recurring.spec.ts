@@ -305,7 +305,8 @@ test('Ta bort alla händelser tar bort serien, och Ångra skapar den igen', asyn
   await page.getByRole('button', { name: 'Ångra' }).click()
 
   await expect(eventBlock(page, 'Veckomöte')).toBeVisible()
-  expect(writes(api, 'POST')).toHaveLength(1)
+  // Händelsen syns direkt (optimistiskt). POST skickas först när den pågående borttagningen är klar.
+  await expect.poll(() => writes(api, 'POST').length).toBe(1)
   expect(writes(api, 'POST')[0]?.body).toMatchObject({
     summary: 'Veckomöte',
     recurrence: ['RRULE:FREQ=WEEKLY'],

@@ -49,7 +49,12 @@ export function UndoToaster({ manager }: UndoToasterProps) {
             onAction: event.undo,
           }
         case 'undone':
-          return { tone: 'info', message: t('undo.undone', { label: event.label }) }
+          return {
+            tone: 'info',
+            message: t('undo.undone', { label: event.label }),
+            actionLabel: t('undo.redo'),
+            onAction: event.redo,
+          }
         case 'redone':
           return { tone: 'info', message: t('undo.redone', { label: event.label }) }
       }

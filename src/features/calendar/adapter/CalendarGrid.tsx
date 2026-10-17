@@ -17,7 +17,7 @@ import interactionPlugin, {
 import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { z } from 'zod'
 import type { StyleContext, UpdateEventTimeRequest } from '@/features/events'
 import { getBrowserTimeZone } from '@/lib/dates'
@@ -31,6 +31,7 @@ import {
   visibleRange,
   type CalendarView,
 } from '../calendarView'
+import { EVENT_CALENDAR_DATASET, EVENT_ID_DATASET, type GridEventRef } from '../eventTarget'
 import {
   DRAFT_EVENT_ID,
   toFullCalendarDraft,
@@ -52,9 +53,7 @@ const DEFAULT_SCROLL_TIME = '07:00:00'
 
 const MONTH_VIEW = 'dayGridMonth'
 
-/** Det vi lagt i extendedProps för varje händelse (se 	oFullCalendarEvents). */
-const CALENDAR_ID_ATTRIBUTE = 'scCalendarId'
-const EVENT_ID_ATTRIBUTE = 'scEventId'
+/** Det vi lagt i extendedProps för varje händelse (se toFullCalendarEvents). */
 const eventPropsSchema = z.object({
   calendarId: z.string(),
   eventId: z.string(),
@@ -153,10 +152,11 @@ export interface CalendarGridProps {
   onEventTimeChange?: (request: UpdateEventTimeRequest) => void
   /** Användaren klickade på (eller valde med tangentbordet) en händelse. Utkastet räknas inte. */
   onEventClick?: (ref: EventRef) => void
-  /** Delete eller Backspace på en händelse som har tangentbordsfokus. Den som tar emot avgör om den får tas bort. */
-  onEventDelete?: (ref: EventRef) => void
-  /** Ctrl/Cmd+D på en händelse som har tangentbordsfokus. */
-  onEventDuplicate?: (ref: EventRef) => void
+  /**
+   * Händelsen som kortkommandon gäller. Ritas med en ring även när fokus ligger någon annanstans.
+   * Själva tangenterna hanteras av sidan, inte av rutnätet.
+   */
+  selected?: GridEventRef | null
   /** Användaren släppte en händelse på ny plats med Alt nedtryckt: gör en kopia där i stället för att flytta. */
   onEventCopy?: (ref: EventRef, to: EventTime) => void
 }
@@ -189,11 +189,11 @@ export function CalendarGrid({
   editableCalendarIds,
   onEventTimeChange,
   onEventClick,
-  onEventDelete,
-  onEventDuplicate,
+  selected = null,
   onEventCopy,
 }: CalendarGridProps) {
   const calendarRef = useRef<FullCalendar>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const calendarEvents = useMemo(() => {
     const inputs = toFullCalendarEvents(events, styleContext, untitledLabel, editableCalendarIds)
     return draft ? [...inputs, toFullCalendarDraft(draft, styleContext)] : inputs
@@ -234,51 +234,41 @@ export function CalendarGrid({
     },
     [onSelectTime],
   )
+  // Ringen runt den valda händelsen. FullCalendar monterar händelser efter vår rendering, så både
+  // eventDidMount och effekten behövs.
+  const markSelected = useCallback(() => {
+    const root = rootRef.current
+    if (root === null) return
+    for (const element of root.querySelectorAll<HTMLElement>('.fc-event')) {
+      const on =
+        selected !== null &&
+        element.dataset[EVENT_CALENDAR_DATASET] === selected.calendarId &&
+        element.dataset[EVENT_ID_DATASET] === selected.eventId
+      element.classList.toggle('sc-selected', on)
+      if (on) element.setAttribute('aria-current', 'true')
+      else element.removeAttribute('aria-current')
+    }
+  }, [selected])
+
+  useEffect(() => {
+    markSelected()
+  }, [markSelected, selected, calendarEvents])
+
   const handleEventDidMount = useCallback(
     (arg: EventMountArg) => {
       if (arg.event.id === DRAFT_EVENT_ID) {
         onDraftElement?.(arg.el)
         return
       }
-      // Så att tangentbordshanteringen vet vilken händelse ett fokuserat element är.
+      // Så att kortkommandon och fokusåterställning vet vilken händelse elementet är.
       const props = eventPropsSchema.safeParse(arg.event.extendedProps)
       if (props.success) {
-        arg.el.dataset[CALENDAR_ID_ATTRIBUTE] = props.data.calendarId
-        arg.el.dataset[EVENT_ID_ATTRIBUTE] = props.data.eventId
+        arg.el.dataset[EVENT_CALENDAR_DATASET] = props.data.calendarId
+        arg.el.dataset[EVENT_ID_DATASET] = props.data.eventId
       }
+      markSelected()
     },
-    [onDraftElement],
-  )
-
-  // Delete/Backspace tar bort och Ctrl/Cmd+D duplicerar händelsen som har fokus (Tab eller ett klick som stängts).
-  const handleKeyDown = useCallback(
-    (keyEvent: KeyboardEvent<HTMLDivElement>) => {
-      if (!(keyEvent.target instanceof HTMLElement)) return
-      const element = keyEvent.target.closest<HTMLElement>('.fc-event')
-      // Bara när själva händelsen har fokus, inte något inuti den.
-      if (element !== keyEvent.target) return
-      const calendarId = element.dataset[CALENDAR_ID_ATTRIBUTE]
-      const eventId = element.dataset[EVENT_ID_ATTRIBUTE]
-      if (calendarId === undefined || eventId === undefined) return
-      const ref = { calendarId, eventId }
-
-      if (keyEvent.key === 'Delete' || keyEvent.key === 'Backspace') {
-        if (onEventDelete === undefined) return
-        keyEvent.preventDefault()
-        onEventDelete(ref)
-      } else if (
-        keyEvent.key.toLowerCase() === 'd' &&
-        (keyEvent.ctrlKey || keyEvent.metaKey) &&
-        !keyEvent.altKey &&
-        !keyEvent.shiftKey
-      ) {
-        if (onEventDuplicate === undefined) return
-        // Annars sparar webbläsaren sidan som bokmärke.
-        keyEvent.preventDefault()
-        onEventDuplicate(ref)
-      }
-    },
-    [onEventDelete, onEventDuplicate],
+    [onDraftElement, markSelected],
   )
 
   const handleEventClick = useCallback(
@@ -342,12 +332,7 @@ export function CalendarGrid({
   )
 
   return (
-    <div
-      className="sc-calendar-grid"
-      role="region"
-      aria-label={ariaLabel}
-      onKeyDown={handleKeyDown}
-    >
+    <div ref={rootRef} className="sc-calendar-grid" role="region" aria-label={ariaLabel}>
       <FullCalendar
         ref={calendarRef}
         plugins={PLUGINS}

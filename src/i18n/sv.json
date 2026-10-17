@@ -18,6 +18,7 @@
   "undo": {
     "region": "Aviseringar",
     "undo": "Ångra",
+    "redo": "Gör om",
     "dismiss": "Stäng",
     "undone": "Ångrade: {{label}}",
     "redone": "Gjorde om: {{label}}",
@@ -92,7 +93,53 @@
       "title": "Vissa kalendrar kunde inte hämtas",
       "description": "{{failed}} av {{total}} kalendrar visas inte. Händelserna från de andra visas som vanligt."
     },
-    "truncated": "Några händelser visas inte eftersom en kalender har väldigt många händelser den här veckan."
+    "truncated": "Några händelser visas inte eftersom en kalender har väldigt många händelser den här veckan.",
+    "shortcuts": {
+      "open": "Kortkommandon (?)",
+      "title": "Kortkommandon",
+      "description": "På Mac används Cmd i stället för Ctrl. Gäller när du inte skriver i ett fält.",
+      "close": "Stäng",
+      "selected": "Vald händelse: {{title}}",
+      "groups": {
+        "navigate": "Navigering",
+        "events": "Händelser",
+        "history": "Ångra"
+      },
+      "keys": {
+        "day": "Dag",
+        "week": "Vecka",
+        "days": "N dagar",
+        "month": "Månad",
+        "agenda": "Schema",
+        "today": "Idag",
+        "next": "Nästa period",
+        "previous": "Föregående period",
+        "create": "Ny händelse",
+        "edit": "Redigera vald händelse",
+        "delete": "Ta bort vald händelse",
+        "duplicate": "Duplicera vald händelse",
+        "undo": "Ångra",
+        "redo": "Gör om",
+        "help": "Visa den här listan"
+      },
+      "combos": {
+        "day": "D",
+        "week": "W",
+        "days": "N",
+        "month": "M",
+        "agenda": "A",
+        "today": "T",
+        "next": "J eller →",
+        "previous": "K eller ←",
+        "create": "C",
+        "edit": "E",
+        "delete": "Delete eller Backspace",
+        "duplicate": "Ctrl+D",
+        "undo": "Ctrl+Z",
+        "redo": "Ctrl+Shift+Z eller Ctrl+Y",
+        "help": "?"
+      }
+    }
   },
   "googleAccess": {
     "connect": {

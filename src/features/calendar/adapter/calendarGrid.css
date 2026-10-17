@@ -32,6 +32,14 @@
   outline-offset: 1px;
 }
 
+/* Vald händelse: syns även när fokus ligger i verktygsraden eller på sidan, så att kortkommandona har ett tydligt mål. */
+.sc-calendar-grid .fc-event.sc-selected {
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--ring);
+  z-index: 5;
+}
+
 /*
  * Utkastet: markerar var en ny händelse hamnar medan snabbpopovern är öppen. Det går inte att klicka på,
  * så ett klick bredvid eller på det startar i stället ett nytt utkast.
